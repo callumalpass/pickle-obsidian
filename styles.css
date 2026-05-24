@@ -1,0 +1,73 @@
+.pickle-approval-center-view {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	padding: 8px 0;
+}
+
+.pickle-approval-center-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.pickle-approval-center-table th,
+.pickle-approval-center-table td {
+	padding: 8px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	text-align: left;
+	vertical-align: top;
+}
+
+.pickle-approval-center-table th {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-medium);
+}
+
+.pickle-approval-center-row {
+	cursor: pointer;
+}
+
+.pickle-approval-center-row:focus-visible,
+.pickle-approval-center-row:hover {
+	background: var(--background-modifier-hover);
+}
+
+.pickle-approval-center-title {
+	font-weight: var(--font-medium);
+}
+
+.pickle-approval-center-file-link {
+	margin: 0;
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--link-color);
+	font: inherit;
+	padding: 0;
+	text-align: left;
+}
+
+.pickle-approval-center-file-link:hover,
+.pickle-approval-center-file-link:focus-visible {
+	color: var(--link-color-hover);
+	text-decoration: underline;
+}
+
+.pickle-approval-center-meta {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.pickle-approval-center-empty {
+	color: var(--text-muted);
+	padding: 16px 8px;
+}
+
+.pickle-response-modal .setting-item-control {
+	min-width: min(360px, 50vw);
+}
+
+.pickle-response-modal textarea {
+	min-height: 96px;
+}

@@ -1,0 +1,5 @@
+node_modules/
+main.js
+coverage/
+.copy-files.local
+.DS_Store
