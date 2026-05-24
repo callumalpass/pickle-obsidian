@@ -1,10 +1,10 @@
 import { Notice, PluginSettingTab, Setting, type App } from "obsidian";
-import type PickleApprovalCenterPlugin from "../main";
+import type PicklePlugin from "../main";
 
-export class PickleApprovalSettingsTab extends PluginSettingTab {
-	private readonly plugin: PickleApprovalCenterPlugin;
+export class PickleSettingsTab extends PluginSettingTab {
+	private readonly plugin: PicklePlugin;
 
-	constructor(app: App, plugin: PickleApprovalCenterPlugin) {
+	constructor(app: App, plugin: PicklePlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}

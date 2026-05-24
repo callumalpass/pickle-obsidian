@@ -12,6 +12,7 @@ import {
 	normalizeVaultPath,
 	safeAttachmentName,
 	slugify,
+	stripMarkdownExtension,
 	uniqueTimestamp,
 	vaultPathForCollectionPath,
 	collectionRelativePath,
@@ -26,8 +27,10 @@ import {
 import type {
 	CreateResponseInput,
 	CreateResponseResult,
+	UpdateResponseInput,
 	PickleApprovalSettings,
 	PickleRequestRecord,
+	PickleResponseRecord,
 	SmokeTestResult,
 	TypeDefinition,
 	ValidationIssue,
@@ -110,32 +113,57 @@ export class PickleCollectionService {
 	async ensureCollection(): Promise<{ collectionPath: string; basePath: string }> {
 		await this.ensureVaultFolder(this.collectionFolder);
 		await this.ensureVaultFolder(joinVaultPath(this.collectionFolder, "_types"));
-		await this.ensureVaultFolder(joinVaultPath(this.collectionFolder, this.settings.requestsFolder));
-		await this.ensureVaultFolder(joinVaultPath(this.collectionFolder, this.settings.responsesFolder));
+		await this.ensureVaultFolder(
+			joinVaultPath(this.collectionFolder, this.settings.requestsFolder)
+		);
+		await this.ensureVaultFolder(
+			joinVaultPath(this.collectionFolder, this.settings.responsesFolder)
+		);
 		await this.ensureVaultFolder(
 			joinVaultPath(this.collectionFolder, this.settings.attachmentsFolder)
 		);
 
-		await this.writeTextFileIfMissing(
-			joinVaultPath(this.collectionFolder, "mdbase.yaml"),
-			MDBASE_CONFIG
-		);
+		await this.ensureMdbaseConfig();
 		await this.writeTextFileIfMissing(
 			joinVaultPath(this.collectionFolder, "_types", `${REQUEST_TYPE}.md`),
 			PICKLE_REQUEST_TYPE
 		);
-			await this.writeTextFileIfMissing(
-				joinVaultPath(this.collectionFolder, "_types", `${DEFAULT_APPROVAL_RESPONSE_TYPE}.md`),
-				PICKLE_APPROVAL_RESPONSE_TYPE
-			);
-			await this.ensureDefaultBaseFile();
-			await this.syncRequestStatuses();
+		await this.writeTextFileIfMissing(
+			joinVaultPath(
+				this.collectionFolder,
+				"_types",
+				`${DEFAULT_APPROVAL_RESPONSE_TYPE}.md`
+			),
+			PICKLE_APPROVAL_RESPONSE_TYPE
+		);
+		await this.ensureDefaultBaseFile();
+		await this.syncRequestStatuses();
 
-			return {
-				collectionPath: this.collectionFolder,
-				basePath: this.baseVaultPath,
-			};
+		return {
+			collectionPath: this.collectionFolder,
+			basePath: this.baseVaultPath,
+		};
+	}
+
+	private async ensureMdbaseConfig(): Promise<void> {
+		const configPath = joinVaultPath(this.collectionFolder, "mdbase.yaml");
+		const existing = this.app.vault.getAbstractFileByPath(configPath);
+		if (existing instanceof TFile) {
+			const current = await this.app.vault.cachedRead(existing);
+			const updated = current
+				.replace(/^name:\s*Pickle [Aa]pproval [Cc]enter\s*$/mu, "name: Pickle")
+				.replace(
+					/^description:\s*Local mdbase collection for async human approvals\.\s*$/mu,
+					"description: Local mdbase collection for Pickle requests and responses."
+				);
+			if (updated !== current) {
+				await this.app.vault.modify(existing, updated);
+			}
+			return;
 		}
+
+		await this.writeTextFile(configPath, MDBASE_CONFIG);
+	}
 
 	async ensureDefaultBaseFile(): Promise<string> {
 		await this.writeTextFile(this.baseVaultPath, defaultBaseFile());
@@ -241,6 +269,20 @@ export class PickleCollectionService {
 		});
 	}
 
+	async findResponseForRequest(requestPath: string): Promise<PickleResponseRecord | null> {
+		return await this.withCollection(async (collection) => {
+			const response = await this.responseForRequest(collection, requestPath, true);
+			if (!response) return null;
+
+			return {
+				path: response.path,
+				vaultPath: vaultPathForCollectionPath(this.collectionFolder, response.path),
+				frontmatter: response.frontmatter,
+				body: response.body,
+			};
+		});
+	}
+
 	async createResponse(input: CreateResponseInput): Promise<CreateResponseResult> {
 		await this.ensureCollection();
 
@@ -282,18 +324,7 @@ export class PickleCollectionService {
 				throw new Error(detail ?? createResult.error.message);
 			}
 
-			const updateResult = (await collection.update({
-				path: input.requestPath,
-				fields: {
-					status: "answered",
-				},
-			})) as MdbaseUpdateResult;
-			if (updateResult.error) {
-				const detail = updateResult.issues
-					?.map((issue) => `${issue.path ?? input.requestPath}: ${issue.message}`)
-					.join("; ");
-				throw new Error(detail ?? updateResult.error.message);
-			}
+			await this.markRequestAnswered(collection, input.requestPath);
 
 			return {
 				path: createResult.path ?? responsePath,
@@ -302,6 +333,66 @@ export class PickleCollectionService {
 					createResult.path ?? responsePath
 				),
 				frontmatter: createResult.frontmatter ?? frontmatter,
+				attachmentPaths,
+			};
+		});
+	}
+
+	async updateResponse(input: UpdateResponseInput): Promise<CreateResponseResult> {
+		await this.ensureCollection();
+
+		return await this.withCollection(async (collection) => {
+			const requestResult = (await collection.read(input.requestPath)) as MdbaseReadResult;
+			if (requestResult.error) {
+				throw new Error(requestResult.error.message);
+			}
+			if (!requestResult.types?.includes(REQUEST_TYPE)) {
+				throw new Error(`Response target is not a Pickle request: ${input.requestPath}`);
+			}
+
+			const existingResponse = (await collection.read(input.responsePath)) as MdbaseReadResult;
+			if (existingResponse.error) {
+				throw new Error(existingResponse.error.message);
+			}
+
+			const existingAttachmentPaths = this.stringArray(
+				existingResponse.frontmatter?.attachment_paths
+			);
+			const responseId = stripMarkdownExtension(
+				input.responsePath.split("/").pop() ?? input.responsePath
+			);
+			const newAttachmentPaths = await this.storeAttachments(
+				responseId,
+				input.attachments ?? [],
+				existingAttachmentPaths.length
+			);
+			const attachmentPaths = [...existingAttachmentPaths, ...newAttachmentPaths];
+			const frontmatter = buildResponseFrontmatter({
+				responseType: input.responseType,
+				requestPath: input.requestPath,
+				values: input.values,
+				responder: this.settings.defaultResponder,
+				attachmentPaths,
+			});
+
+			const updateResult = (await collection.update({
+				path: input.responsePath,
+				fields: frontmatter,
+				body: input.body ?? existingResponse.body ?? "",
+			})) as MdbaseUpdateResult;
+			if (updateResult.error) {
+				const detail = updateResult.issues
+					?.map((issue) => `${issue.path ?? input.responsePath}: ${issue.message}`)
+					.join("; ");
+				throw new Error(detail ?? updateResult.error.message);
+			}
+
+			await this.markRequestAnswered(collection, input.requestPath);
+
+			return {
+				path: input.responsePath,
+				vaultPath: vaultPathForCollectionPath(this.collectionFolder, input.responsePath),
+				frontmatter: updateResult.frontmatter ?? frontmatter,
 				attachmentPaths,
 			};
 		});
@@ -319,18 +410,18 @@ export class PickleCollectionService {
 			const createResult = (await collection.create({
 				type: REQUEST_TYPE,
 				path,
-					frontmatter: {
-						title: `Smoke approval ${timestamp}`,
-						source: "pickle-approval-center",
-						kind: "approval",
-						status: "pending",
-						priority: "normal",
-						response_type: DEFAULT_APPROVAL_RESPONSE_TYPE,
-						context: {
-							task: "plugin-smoke-test",
-						},
+				frontmatter: {
+					title: `Smoke approval ${timestamp}`,
+					source: "pickle",
+					kind: "approval",
+					status: "pending",
+					priority: "normal",
+					response_type: DEFAULT_APPROVAL_RESPONSE_TYPE,
+					context: {
+						task: "plugin-smoke-test",
 					},
-				body: "Smoke request created by the Pickle Approval Center plugin.",
+				},
+				body: "Smoke request created by the Pickle plugin.",
 			})) as MdbaseCreateResult;
 
 			if (createResult.error) {
@@ -341,7 +432,7 @@ export class PickleCollectionService {
 				path: createResult.path ?? path,
 				vaultPath: vaultPathForCollectionPath(this.collectionFolder, createResult.path ?? path),
 				frontmatter: createResult.frontmatter ?? {},
-				body: "Smoke request created by the Pickle Approval Center plugin.",
+				body: "Smoke request created by the Pickle plugin.",
 				answered: false,
 				responseCount: 0,
 			};
@@ -434,12 +525,50 @@ export class PickleCollectionService {
 		).length;
 	}
 
+	private async responseForRequest(
+		collection: CollectionInstance,
+		relativePath: string,
+		includeBody: boolean
+	): Promise<MdbaseQueryRow | null> {
+		const allResult = (await collection.query({
+			include_body: includeBody,
+			order_by: [{ field: "responded_at", direction: "desc" }],
+		})) as MdbaseQueryResult;
+		if (allResult.error) {
+			throw new Error(allResult.error.message);
+		}
+
+		return (
+			(allResult.results ?? []).find((row) =>
+				linkTargetsRequest(row.frontmatter.request, relativePath, this.collectionFolder)
+			) ?? null
+		);
+	}
+
+	private async markRequestAnswered(
+		collection: CollectionInstance,
+		relativePath: string
+	): Promise<void> {
+		const updateResult = (await collection.update({
+			path: relativePath,
+			fields: {
+				status: "answered",
+			},
+		})) as MdbaseUpdateResult;
+		if (updateResult.error) {
+			const detail = updateResult.issues
+				?.map((issue) => `${issue.path ?? relativePath}: ${issue.message}`)
+				.join("; ");
+			throw new Error(detail ?? updateResult.error.message);
+		}
+	}
+
 	private async withCollection<T>(
 		callback: (collection: CollectionInstance) => Promise<T>
 	): Promise<T> {
 		const root = this.getCollectionRootAbsolute();
 		if (!root) {
-			throw new Error("Pickle Approval Center requires a desktop filesystem vault.");
+			throw new Error("Pickle requires a desktop filesystem vault.");
 		}
 
 		const opened = await Collection.open(root);
@@ -456,15 +585,21 @@ export class PickleCollectionService {
 
 	private async storeAttachments(
 		responseId: string,
-		attachments: Array<{ name: string; data: ArrayBuffer }>
+		attachments: Array<{ name: string; data: ArrayBuffer }>,
+		startIndex = 0
 	): Promise<string[]> {
+		if (attachments.length === 0) return [];
+
 		const stored: string[] = [];
 		const attachmentFolder = joinVaultPath(this.settings.attachmentsFolder, responseId);
 		await this.ensureVaultFolder(joinVaultPath(this.collectionFolder, attachmentFolder));
 
 		for (const [index, attachment] of attachments.entries()) {
 			const safeName = safeAttachmentName(attachment.name);
-			const relativePath = joinVaultPath(attachmentFolder, `${index + 1}-${safeName}`);
+			const relativePath = joinVaultPath(
+				attachmentFolder,
+				`${startIndex + index + 1}-${safeName}`
+			);
 			await this.app.vault.adapter.writeBinary(
 				vaultPathForCollectionPath(this.collectionFolder, relativePath),
 				attachment.data
@@ -530,5 +665,11 @@ export class PickleCollectionService {
 
 	private stringValue(value: unknown, fallback: string): string {
 		return typeof value === "string" && value.trim().length > 0 ? value : fallback;
+	}
+
+	private stringArray(value: unknown): string[] {
+		return Array.isArray(value)
+			? value.filter((item): item is string => typeof item === "string")
+			: [];
 	}
 }

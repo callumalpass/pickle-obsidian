@@ -2,8 +2,10 @@ import { Notice, Plugin, TFile } from "obsidian";
 import { createBasesViewRegistration } from "./src/basesView";
 import { PickleCollectionService } from "./src/collectionService";
 import { DEFAULT_SETTINGS } from "./src/constants";
+import { PICKLE_ICON_ID, registerPickleIcon } from "./src/icons";
+import { isPickleRequestFile } from "./src/requestDetection";
 import { PickleResponseModal } from "./src/responseModal";
-import { PickleApprovalSettingsTab } from "./src/settingsTab";
+import { PickleSettingsTab } from "./src/settingsTab";
 import type {
 	PickleApprovalSettings,
 	PickleRequestRecord,
@@ -11,15 +13,16 @@ import type {
 	ValidationSummary,
 } from "./src/types";
 
-export default class PickleApprovalCenterPlugin extends Plugin {
+export default class PicklePlugin extends Plugin {
 	settings: PickleApprovalSettings = { ...DEFAULT_SETTINGS };
 	service!: PickleCollectionService;
 
 	override async onload(): Promise<void> {
 		await this.loadSettings();
+		registerPickleIcon();
 		this.service = new PickleCollectionService(this.app, () => this.settings);
 
-		this.addSettingTab(new PickleApprovalSettingsTab(this.app, this));
+		this.addSettingTab(new PickleSettingsTab(this.app, this));
 		this.registerPickleBasesView();
 		this.registerCommands();
 
@@ -67,6 +70,14 @@ export default class PickleApprovalCenterPlugin extends Plugin {
 		new PickleResponseModal(this.app, this.service, request).open();
 	}
 
+	private getActivePickleRequestFile(): TFile | null {
+		const file = this.app.workspace.getActiveFile();
+		if (!(file instanceof TFile)) return null;
+
+		const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
+		return isPickleRequestFile(file, frontmatter, this.service.collectionFolder) ? file : null;
+	}
+
 	private registerPickleBasesView(): void {
 		try {
 			this.registerBasesView(
@@ -81,7 +92,8 @@ export default class PickleApprovalCenterPlugin extends Plugin {
 	private registerCommands(): void {
 		this.addCommand({
 			id: "ensure-collection",
-			name: "Maintain pickle collection",
+			name: "Maintain collection",
+			icon: PICKLE_ICON_ID,
 			callback: () => {
 				void this.ensureCollection().then((result) => {
 					new Notice(`Maintained Pickle collection: ${result.collectionPath}`);
@@ -91,7 +103,8 @@ export default class PickleApprovalCenterPlugin extends Plugin {
 
 		this.addCommand({
 			id: "validate-collection",
-			name: "Validate pickle collection",
+			name: "Validate collection",
+			icon: "shield-check",
 			callback: () => {
 				void this.validatePickleCollection().then((result) => {
 					new Notice(
@@ -105,7 +118,8 @@ export default class PickleApprovalCenterPlugin extends Plugin {
 
 		this.addCommand({
 			id: "open-request-base",
-			name: "Open pickle request base",
+			name: "Open request base",
+			icon: "table-2",
 			callback: () => {
 				void this.app.workspace.openLinkText(this.service.baseVaultPath, "", false);
 			},
@@ -113,41 +127,19 @@ export default class PickleApprovalCenterPlugin extends Plugin {
 
 		this.addCommand({
 			id: "respond-current-request",
-			name: "Respond to current pickle request",
+			name: "Respond to current request",
+			icon: PICKLE_ICON_ID,
 			checkCallback: (checking) => {
-				const file = this.app.workspace.getActiveFile();
-				const canRun = file instanceof TFile;
-				if (checking) return canRun;
+				const file = this.getActivePickleRequestFile();
+				if (checking) return file !== null;
 				if (!file) {
-					new Notice("No active request file.");
+					new Notice("Active file is not a pickle request.");
 					return false;
 				}
-				void this.openResponseModalForPath(file.path);
+				void this.openResponseModalForPath(file.path).catch((error) => {
+					new Notice(error instanceof Error ? error.message : String(error));
+				});
 				return true;
-			},
-		});
-
-		this.addCommand({
-			id: "seed-sample-request",
-			name: "Seed sample pickle request",
-			callback: () => {
-				void this.createSampleRequest().then((request) => {
-					new Notice(`Created sample Pickle request: ${request.vaultPath}`);
-				});
-			},
-		});
-
-		this.addCommand({
-			id: "run-smoke-test",
-			name: "Run approval center smoke test",
-			callback: () => {
-				void this.runSmokeTest().then((result) => {
-					new Notice(
-						result.valid
-							? `Pickle smoke test passed: ${result.responsePath}`
-							: `Pickle smoke test created files but validation found ${result.issues.length} issues`
-					);
-				});
 			},
 		});
 	}

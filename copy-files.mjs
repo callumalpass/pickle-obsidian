@@ -40,5 +40,5 @@ for (const destination of getDestinations()) {
 		copyFileSync(source, join(destination, file));
 	}
 
-	console.log(`Copied Pickle Approval Center to ${destination}`);
+	console.log(`Copied Pickle to ${destination}`);
 }

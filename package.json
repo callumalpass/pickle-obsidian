@@ -1,7 +1,7 @@
 {
-	"name": "pickle-approval-center",
+	"name": "pickle",
 	"version": "0.1.0",
-	"description": "Mdbase-backed Pickle approval center for Obsidian.",
+	"description": "Mdbase-backed Pickle requests and responses for Obsidian.",
 	"type": "module",
 	"main": "main.js",
 	"scripts": {

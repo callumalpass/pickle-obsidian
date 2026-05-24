@@ -52,6 +52,13 @@ export interface PickleRequestRecord {
 	responseCount: number;
 }
 
+export interface PickleResponseRecord {
+	path: string;
+	vaultPath: string;
+	frontmatter: Record<string, unknown>;
+	body?: string | null;
+}
+
 export interface AttachmentDraft {
 	name: string;
 	data: ArrayBuffer;
@@ -63,6 +70,10 @@ export interface CreateResponseInput {
 	values: Record<string, unknown>;
 	body?: string;
 	attachments?: AttachmentDraft[];
+}
+
+export interface UpdateResponseInput extends CreateResponseInput {
+	responsePath: string;
 }
 
 export interface CreateResponseResult {

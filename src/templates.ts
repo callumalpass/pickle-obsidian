@@ -1,8 +1,8 @@
 import { BASES_VIEW_TYPE, DEFAULT_APPROVAL_RESPONSE_TYPE, REQUEST_TYPE } from "./constants";
 
 export const MDBASE_CONFIG = `spec_version: "0.2.1"
-name: Pickle approval center
-description: Local mdbase collection for async human approvals.
+name: Pickle
+description: Local mdbase collection for Pickle requests and responses.
 settings:
   types_folder: "_types"
   migrations_folder: "_types/_migrations"
@@ -98,10 +98,7 @@ fields:
 `;
 
 export function defaultBaseFile(): string {
-	return `filters:
-  and:
-    - type == "${REQUEST_TYPE}"
-properties:
+	return `properties:
   title:
     displayName: Title
   source:
@@ -116,11 +113,24 @@ properties:
     displayName: Created
   status:
     displayName: Status
+  request:
+    displayName: Request
+  decision:
+    displayName: Decision
+  comment:
+    displayName: Comment
+  responded_at:
+    displayName: Responded
+  responder:
+    displayName: Responder
+  attachment_paths:
+    displayName: Attachments
 views:
   - type: ${BASES_VIEW_TYPE}
     name: Pending
     filters:
       and:
+        - type == "${REQUEST_TYPE}"
         - status == "pending"
     order:
       - priority
@@ -135,6 +145,7 @@ views:
     name: Answered
     filters:
       and:
+        - type == "${REQUEST_TYPE}"
         - status == "answered"
     order:
       - priority
@@ -146,7 +157,10 @@ views:
       - status
       - file.name
   - type: table
-    name: All
+    name: All requests
+    filters:
+      and:
+        - type == "${REQUEST_TYPE}"
     order:
       - status
       - priority
@@ -155,6 +169,58 @@ views:
       - kind
       - response_type
       - created_at
+      - file.name
+  - type: table
+    name: Responses
+    filters:
+      and:
+        - request != null
+    order:
+      - responded_at
+      - decision
+      - request
+      - responder
+      - comment
+      - attachment_paths
+      - file.name
+  - type: table
+    name: Approved
+    filters:
+      and:
+        - request != null
+        - decision == "approve"
+    order:
+      - responded_at
+      - request
+      - responder
+      - comment
+      - attachment_paths
+      - file.name
+  - type: table
+    name: Rejected
+    filters:
+      and:
+        - request != null
+        - decision == "reject"
+    order:
+      - responded_at
+      - request
+      - responder
+      - comment
+      - attachment_paths
+      - file.name
+  - type: table
+    name: Revisions
+    filters:
+      and:
+        - request != null
+        - decision == "revise"
+    order:
+      - responded_at
+      - request
+      - responder
+      - comment
+      - attachment_paths
       - file.name
 	`;
 }

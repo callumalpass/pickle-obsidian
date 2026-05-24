@@ -1,27 +1,65 @@
 .pickle-approval-center-view {
 	display: flex;
 	flex-direction: column;
-	gap: 12px;
-	padding: 8px 0;
+	gap: var(--size-4-2, 8px);
+	padding: var(--size-4-1, 4px) 0 var(--size-4-3, 12px);
+	color: var(--text-normal);
+}
+
+.pickle-approval-center-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	width: max-content;
+	max-width: 100%;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s, 4px);
+	background: var(--background-secondary);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	line-height: 1.3;
+	padding: 1px 6px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	text-transform: capitalize;
+	white-space: nowrap;
 }
 
 .pickle-approval-center-table {
+	min-width: 760px;
 	width: 100%;
-	border-collapse: collapse;
+	border-collapse: separate;
+	border-spacing: 0;
+}
+
+.pickle-approval-center-table-wrap {
+	overflow-x: auto;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s, 4px);
+	background: var(--background-primary);
 }
 
 .pickle-approval-center-table th,
 .pickle-approval-center-table td {
-	padding: 8px;
+	padding: 8px 10px;
 	border-bottom: 1px solid var(--background-modifier-border);
 	text-align: left;
-	vertical-align: top;
+	vertical-align: middle;
 }
 
 .pickle-approval-center-table th {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	background: var(--background-primary);
 	color: var(--text-muted);
 	font-size: var(--font-ui-smaller);
 	font-weight: var(--font-medium);
+	white-space: nowrap;
+}
+
+.pickle-approval-center-table tbody tr:last-child td {
+	border-bottom: 0;
 }
 
 .pickle-approval-center-row {
@@ -33,41 +71,577 @@
 	background: var(--background-modifier-hover);
 }
 
-.pickle-approval-center-title {
+.pickle-approval-center-row.is-answered {
+	color: var(--text-muted);
+}
+
+.pickle-approval-center-cell-title {
+	min-width: 240px;
+}
+
+.pickle-approval-center-cell-type-string,
+.pickle-approval-center-cell-type-object {
+	max-width: 260px;
+}
+
+.pickle-approval-center-action-cell {
+	width: 1%;
+	text-align: right;
+	white-space: nowrap;
+}
+
+.pickle-approval-center-title-stack {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.pickle-approval-center-title-link {
+	max-width: 36ch;
+	overflow: hidden;
+	color: var(--text-normal);
 	font-weight: var(--font-medium);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.pickle-approval-center-title-meta {
+	max-width: 52ch;
+	overflow: hidden;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .pickle-approval-center-file-link {
+	height: auto;
+	min-height: 0;
 	margin: 0;
+	padding: 0;
 	border: 0;
 	background: transparent;
+	background-color: transparent;
 	box-shadow: none;
-	color: var(--link-color);
+	color: var(--text-accent);
 	font: inherit;
-	padding: 0;
+	line-height: inherit;
 	text-align: left;
 }
 
 .pickle-approval-center-file-link:hover,
 .pickle-approval-center-file-link:focus-visible {
-	color: var(--link-color-hover);
+	color: var(--text-accent-hover);
 	text-decoration: underline;
 }
 
-.pickle-approval-center-meta {
+.pickle-approval-center-view button.pickle-approval-center-file-link {
+	background-color: transparent;
+	box-shadow: none;
+}
+
+.pickle-approval-center-pill-status-pending {
+	border-color: var(--background-modifier-border-focus);
+	color: var(--text-accent);
+}
+
+.pickle-approval-center-pill-status-answered {
+	color: var(--text-success);
+}
+
+.pickle-approval-center-pill-priority-high,
+.pickle-approval-center-pill-priority-urgent {
+	color: var(--text-error);
+}
+
+.pickle-approval-center-pill-priority-low {
+	color: var(--text-faint);
+}
+
+.pickle-approval-center-text-value,
+.pickle-approval-center-object-value {
+	display: inline-flex;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	vertical-align: middle;
+	white-space: nowrap;
+}
+
+.pickle-approval-center-text-value.is-empty {
+	color: var(--text-faint);
+}
+
+.pickle-approval-center-number {
+	color: var(--text-normal);
+	font-variant-numeric: tabular-nums;
+}
+
+.pickle-approval-center-date {
 	color: var(--text-muted);
 	font-size: var(--font-ui-smaller);
+	white-space: nowrap;
+}
+
+.pickle-approval-center-list-value {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	max-width: 100%;
+}
+
+.pickle-approval-center-list-item,
+.pickle-approval-center-list-more {
+	display: inline-flex;
+	max-width: 18ch;
+	overflow: hidden;
+	padding: 1px 6px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s, 4px);
+	background: var(--background-secondary);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	line-height: 1.3;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.pickle-approval-center-object-key,
+.pickle-approval-center-object-more {
+	color: var(--text-faint);
+}
+
+.pickle-approval-center-object-preview {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.pickle-approval-center-action-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 }
 
 .pickle-approval-center-empty {
 	color: var(--text-muted);
-	padding: 16px 8px;
+	padding: var(--size-4-6, 24px) var(--size-4-2, 8px);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s, 4px);
+	background: var(--background-secondary);
 }
 
-.pickle-response-modal .setting-item-control {
-	min-width: min(360px, 50vw);
+.pickle-approval-center-empty-title {
+	color: var(--text-normal);
+	font-size: var(--font-ui-medium);
+	font-weight: var(--font-medium);
+}
+
+.pickle-approval-center-empty-copy {
+	margin-top: 4px;
+	max-width: 56ch;
+	font-size: var(--font-ui-small);
+}
+
+.modal.pickle-response-modal {
+	width: min(1120px, 94vw);
+	max-width: min(1120px, 94vw);
+}
+
+.pickle-response-modal-content {
+	display: grid;
+	grid-template-rows: minmax(0, 1fr) auto;
+	gap: var(--size-4-3, 12px);
+	height: min(720px, calc(88vh - 84px));
+	overflow: hidden;
+}
+
+.pickle-response-modal-layout {
+	display: grid;
+	grid-template-columns: minmax(300px, 0.9fr) minmax(360px, 1fr);
+	gap: var(--size-4-4, 16px);
+	min-height: 0;
+}
+
+.pickle-response-modal-pane {
+	min-width: 0;
+	min-height: 0;
+	overflow: auto;
+}
+
+.pickle-response-modal-request-pane {
+	padding-right: var(--size-4-4, 16px);
+	border-right: 1px solid var(--background-modifier-border);
+}
+
+.pickle-response-modal-response-pane {
+	padding-left: var(--size-4-1, 4px);
+	padding-right: var(--size-4-3, 12px);
+	scrollbar-gutter: stable;
+}
+
+.pickle-response-modal-request {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding-bottom: var(--size-4-3, 12px);
+}
+
+.pickle-response-modal-eyebrow,
+.pickle-response-modal-context,
+.pickle-response-modal-section-description,
+.pickle-response-modal-attachment-list,
+.pickle-response-modal-error-message,
+.pickle-response-modal-field-description,
+.pickle-response-modal-context-count {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	line-height: var(--line-height-normal);
+}
+
+.pickle-response-modal-path {
+	color: var(--text-faint);
+}
+
+.pickle-response-modal-request-title {
+	margin: 0;
+	color: var(--text-normal);
+	font-size: var(--font-ui-large);
+	font-weight: var(--font-semibold);
+	line-height: var(--line-height-tight);
+}
+
+.pickle-response-modal-section-title,
+.pickle-response-modal-error-title,
+.pickle-response-modal-field-title {
+	color: var(--text-normal);
+	font-size: var(--font-ui-medium);
+	font-weight: var(--font-semibold);
+}
+
+.pickle-response-modal-section-header {
+	padding-bottom: var(--size-4-2, 8px);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.pickle-response-modal-context-details {
+	padding: var(--size-4-3, 12px) 0;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.pickle-response-modal-context-summary {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2, 8px);
+	color: var(--text-normal);
+	font-size: var(--font-ui-small);
+	font-weight: var(--font-medium);
+	cursor: pointer;
+}
+
+.pickle-response-modal-context-count {
+	margin-left: auto;
+	font-weight: var(--font-normal);
+}
+
+.pickle-response-modal-context-list {
+	display: grid;
+	gap: 6px;
+	margin-top: var(--size-4-2, 8px);
+}
+
+.pickle-response-modal-context-item {
+	display: grid;
+	grid-template-columns: minmax(72px, 0.28fr) minmax(0, 1fr);
+	gap: var(--size-4-2, 8px);
+	font-size: var(--font-ui-smaller);
+}
+
+.pickle-response-modal-context-key {
+	color: var(--text-faint);
+}
+
+.pickle-response-modal-context-value {
+	min-width: 0;
+	overflow-wrap: anywhere;
+	color: var(--text-muted);
+}
+
+.pickle-response-modal-body-markdown {
+	margin-top: var(--size-4-2, 8px);
+	padding: var(--size-4-3, 12px);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s, 4px);
+	background: var(--background-secondary);
+	font-size: var(--font-ui-small);
+	line-height: var(--line-height-normal);
+}
+
+.pickle-response-modal-body-markdown > :first-child {
+	margin-top: 0;
+}
+
+.pickle-response-modal-body-markdown > :last-child {
+	margin-bottom: 0;
+}
+
+.pickle-response-modal-request-actions {
+	padding-top: var(--size-4-3, 12px);
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.pickle-response-modal-fields {
+	display: grid;
+	gap: var(--size-4-4, 16px);
+	padding-top: var(--size-4-3, 12px);
+	border-top: 0;
+}
+
+.pickle-response-modal-field {
+	padding: 0;
+	border-bottom: 0;
+}
+
+.pickle-response-modal-fields .setting-item {
+	padding: 0;
+	border: 0;
+}
+
+.modal.pickle-response-modal:not(.mod-settings)
+	.pickle-response-modal-fields
+	.setting-item:not(.setting-item-heading),
+.modal.pickle-response-modal:not(.mod-settings)
+	.pickle-response-modal-list-item
+	.setting-item:not(.setting-item-heading) {
+	padding: 0;
+	border: 0;
+}
+
+.pickle-response-modal-field .setting-item-info {
+	min-width: 0;
+}
+
+.pickle-response-modal-field .setting-item-control {
+	min-width: min(260px, 42%);
+}
+
+.pickle-response-modal-field.is-required .setting-item-name {
+	color: var(--text-normal);
+	font-weight: var(--font-medium);
+}
+
+.pickle-response-modal-field-textarea {
+	display: block;
+}
+
+.pickle-response-modal-field-textarea .setting-item-info {
+	margin-bottom: var(--size-4-2, 8px);
+}
+
+.pickle-response-modal-field-textarea .setting-item-control {
+	width: 100%;
+	min-width: 0;
+}
+
+.pickle-response-modal-field-string textarea,
+.pickle-response-modal-field-list textarea,
+.pickle-response-modal-field-object textarea {
+	width: 100%;
+}
+
+.pickle-response-modal-field-name-comment textarea {
+	min-height: 132px;
+}
+
+.pickle-response-modal-nested-field {
+	display: block;
+}
+
+.pickle-response-modal-nested-header {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin-bottom: var(--size-4-2, 8px);
+}
+
+.pickle-response-modal-nested-fields {
+	display: grid;
+	gap: var(--size-4-2, 8px);
+	overflow: visible;
+	border: 0;
+	background: transparent;
+}
+
+.pickle-response-modal-list-items {
+	display: grid;
+	gap: 6px;
+}
+
+.pickle-response-modal-list-item {
+	display: grid;
+	grid-template-columns: minmax(112px, 0.32fr) minmax(0, 1fr);
+	align-items: center;
+	gap: var(--size-4-2, 8px);
+	min-width: 0;
+}
+
+.pickle-response-modal-list-item-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--size-4-2, 8px);
+	min-width: 0;
+}
+
+.pickle-response-modal-list-item-title {
+	overflow: hidden;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-normal);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.pickle-response-modal-list-item > .pickle-response-modal-field,
+.pickle-response-modal-list-item > .pickle-response-modal-nested-field {
+	padding: 0;
+	border-bottom: 0;
+}
+
+.pickle-response-modal-list-item > .pickle-response-modal-field .setting-item {
+	padding: 0;
+	border: 0;
+}
+
+.pickle-response-modal-list-item > .pickle-response-modal-field .setting-item-info {
+	display: none;
+}
+
+.pickle-response-modal-list-item > .pickle-response-modal-field .setting-item-control {
+	width: 100%;
+	min-width: 0;
+}
+
+.pickle-response-modal-list-actions {
+	margin-top: var(--size-4-2, 8px);
 }
 
 .pickle-response-modal textarea {
 	min-height: 96px;
+	resize: vertical;
+}
+
+.pickle-response-modal-attachments {
+	padding: var(--size-4-3, 12px) 0 0;
+	border-bottom: 0;
+}
+
+.pickle-response-modal-attachments input[type="file"] {
+	max-width: 100%;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.pickle-response-modal-field-header {
+	margin-bottom: var(--size-4-2, 8px);
+}
+
+.pickle-response-modal-attachment-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--size-4-1, 4px);
+	padding-top: 2px;
+}
+
+.pickle-response-modal-attachment {
+	max-width: 100%;
+	overflow: hidden;
+	padding: 2px 6px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s, 4px);
+	background: var(--background-secondary);
+	color: var(--text-muted);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.pickle-response-modal-footer {
+	padding-top: var(--size-4-3, 12px);
+	border-top: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+}
+
+.pickle-response-modal-actions {
+	padding: 0;
+	border: 0;
+}
+
+.pickle-response-modal-actions .setting-item {
+	padding: 0;
+	border: 0;
+}
+
+.pickle-response-modal-actions .setting-item-control {
+	min-width: 0;
+}
+
+.pickle-response-modal-error {
+	padding: var(--size-4-4, 16px);
+	border: 1px solid var(--background-modifier-error);
+	border-radius: var(--radius-s, 4px);
+	background: var(--background-modifier-error);
+}
+
+@media (max-width: 860px) {
+	.modal.pickle-response-modal {
+		width: min(720px, 94vw);
+	}
+
+	.pickle-response-modal-content {
+		height: min(760px, calc(88vh - 84px));
+	}
+
+	.pickle-response-modal-layout {
+		grid-template-columns: 1fr;
+	}
+
+	.pickle-response-modal-request-pane {
+		max-height: 38vh;
+		padding-right: 0;
+		padding-bottom: var(--size-4-3, 12px);
+		border-right: 0;
+		border-bottom: 1px solid var(--background-modifier-border);
+	}
+
+	.pickle-response-modal-response-pane {
+		padding-left: 0;
+	}
+}
+
+@media (max-width: 640px) {
+	.pickle-response-modal-field,
+	.pickle-response-modal .setting-item {
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.pickle-response-modal-field .setting-item-control {
+		min-width: 0;
+	}
+
+	.pickle-response-modal .setting-item-control {
+		min-width: 0;
+		width: 100%;
+	}
+
+	.pickle-response-modal input[type="text"],
+	.pickle-response-modal textarea,
+	.pickle-response-modal select {
+		width: 100%;
+	}
+
+	.pickle-response-modal-list-item {
+		grid-template-columns: 1fr;
+		gap: 4px;
+	}
 }

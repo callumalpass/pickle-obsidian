@@ -49,4 +49,34 @@ describe("response builder", () => {
 			attachment_paths: ["attachments/r1/context.txt"],
 		});
 	});
+
+	it("preserves nested response values for complex response schemas", () => {
+		const frontmatter = buildResponseFrontmatter({
+			responseType: "pickle_response_complex",
+			requestPath: "requests/complex-approval.md",
+			values: {
+				decision: "approve",
+				risk_accepted: true,
+				rollout_steps: ["Deploy canary", "Promote after review"],
+				review: {
+					summary: "The staged rollout is acceptable.",
+					severity: "medium",
+				},
+			},
+			responder: "callum",
+			attachmentPaths: [],
+			now: new Date("2026-05-24T00:00:00.000Z"),
+		});
+
+		expect(frontmatter).toMatchObject({
+			type: "pickle_response_complex",
+			decision: "approve",
+			risk_accepted: true,
+			rollout_steps: ["Deploy canary", "Promote after review"],
+			review: {
+				summary: "The staged rollout is acceptable.",
+				severity: "medium",
+			},
+		});
+	});
 });
