@@ -1,10 +1,10 @@
 {
-	"id": "pickle-approval-center",
+	"id": "pickle",
 	"name": "Pickle",
 	"version": "0.1.0",
 	"minAppVersion": "1.12.2",
-	"description": "Mdbase-backed Pickle requests and responses in an Obsidian vault.",
+	"description": "Local-first, file-based agent inbox for typed requests and responses.",
 	"author": "Callum Alpass",
 	"authorUrl": "https://github.com/callumalpass",
-	"isDesktopOnly": true
+	"isDesktopOnly": false
 }

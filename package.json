@@ -1,7 +1,7 @@
 {
 	"name": "pickle",
 	"version": "0.1.0",
-	"description": "Mdbase-backed Pickle requests and responses for Obsidian.",
+	"description": "Local-first, file-based agent inbox for Obsidian.",
 	"type": "module",
 	"main": "main.js",
 	"scripts": {
@@ -13,18 +13,20 @@
 		"lint:css": "stylelint \"styles.css\" --max-warnings=0",
 		"lint:ts": "eslint . --max-warnings=0",
 		"test": "vitest run",
+		"test:mdbase-spec": "vitest run test/mdbaseSpecCompatibility.test.ts",
 		"typecheck": "tsc --noEmit"
 	},
 	"keywords": [
 		"obsidian",
 		"pickle",
-		"mdbase",
+		"inbox",
+		"agent",
+		"schema",
 		"approval"
 	],
 	"author": "Callum Alpass",
 	"license": "MIT",
 	"dependencies": {
-		"@callumalpass/mdbase": "^0.2.2",
 		"yaml": "^2.8.1"
 	},
 	"devDependencies": {

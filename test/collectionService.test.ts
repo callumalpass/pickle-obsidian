@@ -1,12 +1,16 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { existsSync, statSync } from "node:fs";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { TFile, type App } from "obsidian";
 import { PickleCollectionService } from "../src/collectionService";
-import { DEFAULT_SETTINGS, DEFAULT_APPROVAL_RESPONSE_TYPE } from "../src/constants";
+import {
+	DEFAULT_ACK_RESPONSE_TYPE,
+	DEFAULT_SETTINGS,
+	DEFAULT_APPROVAL_RESPONSE_TYPE,
+} from "../src/constants";
 import { stripMarkdownExtension } from "../src/path";
+import { createFakeApp } from "./fakeObsidianApp";
 
 let tempRoots: string[] = [];
 
@@ -18,27 +22,54 @@ afterEach(async () => {
 });
 
 describe("collection service attachments", () => {
-	it("updates the generated mdbase collection name when maintaining existing files", async () => {
+	it("maintains the acknowledgement response type", async () => {
 		const { root, service } = await createService();
-		await mkdir(join(root, "_pickle"), { recursive: true });
+
+		await service.ensureCollection();
+
+		const ackType = await readFile(
+			join(root, "_pickle", "_types", `${DEFAULT_ACK_RESPONSE_TYPE}.md`),
+			"utf8"
+		);
+		expect(ackType).toContain(`name: ${DEFAULT_ACK_RESPONSE_TYPE}`);
+		expect(ackType).toContain("message:");
+	});
+
+	it("removes field defaults from existing bundled request type files", async () => {
+		const { root, service } = await createService();
+		await mkdir(join(root, "_pickle", "_types"), { recursive: true });
 		await writeFile(
-			join(root, "_pickle", "mdbase.yaml"),
+			join(root, "_pickle", "_types", "pickle_request.md"),
 			[
-				'spec_version: "0.2.1"',
-				"name: Pickle approval center",
-				"description: Local mdbase collection for async human approvals.",
-				"settings:",
-				'  cache_folder: ".mdbase"',
+				"---",
+				"name: pickle_request",
+				"fields:",
+				"  kind:",
+				"    type: enum",
+				"    values: [approval, choice, input, notice]",
+				"    default: approval",
+				"  status:",
+				"    type: enum",
+				"    values: [pending, answered, cancelled]",
+				"    default: pending",
+				"  priority:",
+				"    type: enum",
+				"    values: [low, normal, high, urgent]",
+				"    default: normal",
+				"---",
 				"",
 			].join("\n")
 		);
 
 		await service.ensureCollection();
 
-		const config = await readFile(join(root, "_pickle", "mdbase.yaml"), "utf8");
-		expect(config).toContain("name: Pickle");
-		expect(config).toContain("description: Local mdbase collection for Pickle requests and responses.");
-		expect(config).not.toContain("approval center");
+		const typeFile = await readFile(
+			join(root, "_pickle", "_types", "pickle_request.md"),
+			"utf8"
+		);
+		expect(typeFile).not.toContain("default: approval");
+		expect(typeFile).not.toContain("default: pending");
+		expect(typeFile).not.toContain("default: normal");
 	});
 
 	it("does not create a per-response attachment folder when there are no attachments", async () => {
@@ -56,6 +87,24 @@ describe("collection service attachments", () => {
 		expect(existsSync(join(root, "_pickle", "attachments"))).toBe(true);
 		expect(existsSync(join(root, "_pickle", "attachments", responseId))).toBe(false);
 		expect(response.attachmentPaths).toEqual([]);
+	});
+
+	it("derives answered state from response links without mutating request status", async () => {
+		const { root, service } = await createService();
+		const request = await service.seedSampleRequest();
+
+		await service.createResponse({
+			requestPath: request.path,
+			responseType: DEFAULT_APPROVAL_RESPONSE_TYPE,
+			values: { decision: "approve" },
+		});
+
+		const requestContent = await readFile(join(root, "_pickle", request.path), "utf8");
+		const reread = await service.readRequest(`_pickle/${request.path}`);
+		expect(requestContent).not.toContain("status: answered");
+		expect(reread.responseCount).toBe(1);
+		expect(reread.answered).toBe(true);
+		expect(reread.derivedStatus).toBe("answered");
 	});
 
 	it("creates the per-response attachment folder when attachments are added", async () => {
@@ -84,48 +133,10 @@ describe("collection service attachments", () => {
 });
 
 async function createService(): Promise<{ root: string; service: PickleCollectionService }> {
-	const root = await mkdtemp(join(tmpdir(), "pickle-approval-center-service-"));
+	const root = await mkdtemp(join(tmpdir(), "pickle-service-"));
 	tempRoots.push(root);
 
 	const app = createFakeApp(root);
 	const service = new PickleCollectionService(app, () => ({ ...DEFAULT_SETTINGS }));
 	return { root, service };
-}
-
-function createFakeApp(root: string): App {
-	const pathFor = (vaultPath: string): string => join(root, vaultPath);
-	const vault = {
-		adapter: {
-			getBasePath: () => root,
-			writeBinary: async (vaultPath: string, data: ArrayBuffer): Promise<void> => {
-				const absolutePath = pathFor(vaultPath);
-				await mkdir(join(absolutePath, ".."), { recursive: true });
-				await writeFile(absolutePath, Buffer.from(data));
-			},
-		},
-		getAbstractFileByPath: (vaultPath: string): { path: string } | null => {
-			const absolutePath = pathFor(vaultPath);
-			if (!existsSync(absolutePath)) return null;
-			if (!statSync(absolutePath).isFile()) return { path: vaultPath };
-
-			const file = Object.create(TFile.prototype) as { path: string };
-			file.path = vaultPath;
-			return file;
-		},
-		createFolder: async (vaultPath: string): Promise<void> => {
-			await mkdir(pathFor(vaultPath));
-		},
-		create: async (vaultPath: string, content: string): Promise<{ path: string }> => {
-			await writeFile(pathFor(vaultPath), content);
-			return { path: vaultPath };
-		},
-		cachedRead: async (file: { path: string }): Promise<string> => {
-			return await readFile(pathFor(file.path), "utf8");
-		},
-		modify: async (file: { path: string }, content: string): Promise<void> => {
-			await writeFile(pathFor(file.path), content);
-		},
-	};
-
-	return { vault } as unknown as App;
 }

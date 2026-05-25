@@ -1,13 +1,22 @@
-import { BASES_VIEW_TYPE, DEFAULT_APPROVAL_RESPONSE_TYPE, REQUEST_TYPE } from "./constants";
+import {
+	BASES_VIEW_TYPE,
+	DEFAULT_ACK_RESPONSE_TYPE,
+	DEFAULT_APPROVAL_RESPONSE_TYPE,
+	REQUEST_TYPE,
+} from "./constants";
 
 export const MDBASE_CONFIG = `spec_version: "0.2.1"
 name: Pickle
 description: Local mdbase collection for Pickle requests and responses.
 settings:
   types_folder: "_types"
-  migrations_folder: "_types/_migrations"
   default_validation: "error"
   default_strict: false
+  exclude:
+    - ".git"
+    - "node_modules"
+    - ".mdbase"
+    - "attachments/**"
   include_subfolders: true
   explicit_type_keys: ["type", "types"]
   cache_folder: ".mdbase"
@@ -27,18 +36,18 @@ fields:
     required: true
   source:
     type: string
+  message:
+    type: string
   kind:
     type: enum
-    values: [approval, choice, input, notice]
-    default: approval
+    values: [approval, choice, input, notice, message]
   status:
     type: enum
+    description: Legacy lifecycle marker. Response links are authoritative for answered state.
     values: [pending, answered, cancelled]
-    default: pending
   priority:
     type: enum
     values: [low, normal, high, urgent]
-    default: normal
   response_type:
     type: string
     required: true
@@ -97,12 +106,42 @@ fields:
 ---
 `;
 
+export const PICKLE_ACK_RESPONSE_TYPE = `---
+name: ${DEFAULT_ACK_RESPONSE_TYPE}
+description: Acknowledge that a Pickle message was read.
+display_name_key: message
+fields:
+  id:
+    type: string
+    generated: ulid
+    unique: true
+  request:
+    type: link
+    target: ${REQUEST_TYPE}
+    validate_exists: true
+    required: true
+  message:
+    type: string
+  responded_at:
+    type: datetime
+    generated: now
+  responder:
+    type: string
+  attachment_paths:
+    type: list
+    items:
+      type: string
+---
+`;
+
 export function defaultBaseFile(): string {
 	return `properties:
   title:
     displayName: Title
   source:
     displayName: Source
+  message:
+    displayName: Message
   kind:
     displayName: Kind
   priority:
@@ -131,11 +170,13 @@ views:
     filters:
       and:
         - type == "${REQUEST_TYPE}"
-        - status == "pending"
+    options:
+      state: pending
     order:
       - priority
       - title
       - source
+      - message
       - kind
       - response_type
       - created_at
@@ -146,11 +187,30 @@ views:
     filters:
       and:
         - type == "${REQUEST_TYPE}"
-        - status == "answered"
+    options:
+      state: answered
     order:
       - priority
       - title
       - source
+      - message
+      - kind
+      - response_type
+      - created_at
+      - status
+      - file.name
+  - type: ${BASES_VIEW_TYPE}
+    name: Conflicts
+    filters:
+      and:
+        - type == "${REQUEST_TYPE}"
+    options:
+      state: conflict
+    order:
+      - priority
+      - title
+      - source
+      - message
       - kind
       - response_type
       - created_at
@@ -166,6 +226,7 @@ views:
       - priority
       - title
       - source
+      - message
       - kind
       - response_type
       - created_at

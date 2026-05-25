@@ -75,6 +75,19 @@ export default [
 	},
 
 	{
+		files: ["*.mjs", "scripts/**/*.mjs"],
+		languageOptions: {
+			globals: {
+				...globals.node,
+				...globals.es2021,
+			},
+		},
+		rules: {
+			"import/no-nodejs-modules": "off",
+		},
+	},
+
+	{
 		files: ["test/**/*.ts"],
 		languageOptions: {
 			parser: tsParser,
@@ -90,12 +103,14 @@ export default [
 		plugins: {
 			"@typescript-eslint": tseslint,
 		},
-		rules: {
-			...tseslint.configs.recommended.rules,
-			"no-unused-vars": "off",
-			"@typescript-eslint/no-unused-vars": "warn",
+			rules: {
+				...tseslint.configs.recommended.rules,
+				"no-unused-vars": "off",
+				"@typescript-eslint/no-unused-vars": "warn",
+				"import/no-nodejs-modules": "off",
+				"obsidianmd/no-tfile-tfolder-cast": "off",
+			},
 		},
-	},
 
 	prettier,
 ];

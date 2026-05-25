@@ -1,3 +1,5 @@
+import type { PickleRequestState } from "./requestState";
+
 export interface PickleApprovalSettings {
 	collectionFolder: string;
 	requestsFolder: string;
@@ -50,6 +52,7 @@ export interface PickleRequestRecord {
 	body?: string | null;
 	answered: boolean;
 	responseCount: number;
+	derivedStatus: PickleRequestState;
 }
 
 export interface PickleResponseRecord {

@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
 const DEFAULT_DESTINATION =
-	"/home/calluma/testvault/test/.obsidian/plugins/pickle-approval-center";
+	"/home/calluma/testvault/test/.obsidian/plugins/pickle";
 const FILES = ["main.js", "styles.css", "manifest.json"];
 
 function expandTilde(value) {

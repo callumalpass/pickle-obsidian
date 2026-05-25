@@ -1,6 +1,7 @@
 import {
 	BasesView,
 	ButtonComponent,
+	type BasesAllOptions,
 	type BasesEntry,
 	type BasesPropertyId,
 	type BasesViewRegistration,
@@ -12,6 +13,7 @@ import type { PickleCollectionService } from "./collectionService";
 import { PICKLE_ICON_ID } from "./icons";
 import { collectionRelativePath } from "./path";
 import { PickleResponseModal } from "./responseModal";
+import type { PickleRequestState } from "./requestState";
 import type { FieldDefinition, PickleRequestRecord, TypeDefinition } from "./types";
 
 const DEFAULT_PROPERTY_ORDER = [
@@ -34,6 +36,8 @@ interface PropertyRenderModel {
 	isDisplayName: boolean;
 }
 
+type PickleRequestViewState = PickleRequestState | "all";
+
 export class PickleRequestsBasesView extends BasesView {
 	override type = BASES_VIEW_TYPE;
 	private readonly containerEl: HTMLElement;
@@ -51,7 +55,7 @@ export class PickleRequestsBasesView extends BasesView {
 	}
 
 	override onload(): void {
-		this.containerEl.addClass("pickle-approval-center-view");
+		this.containerEl.addClass("pickle-view");
 		void this.renderAsync();
 	}
 
@@ -77,28 +81,30 @@ export class PickleRequestsBasesView extends BasesView {
 
 		if (rows.length === 0) {
 			const empty = this.containerEl.createDiv({
-				cls: "pickle-approval-center-empty",
+				cls: "pickle-empty",
 			});
 			empty.createDiv({
-				cls: "pickle-approval-center-empty-title",
+				cls: "pickle-empty-title",
 				text: "No matching requests",
 			});
 			empty.createDiv({
-				cls: "pickle-approval-center-empty-copy",
+				cls: "pickle-empty-copy",
 				text: "Change the Bases filters or maintain the Pickle collection to bring requests into this view.",
 			});
 			return;
 		}
 
+		this.renderMobileList(rows, properties, requestType);
+
 		const tableWrap = this.containerEl.createDiv({
-			cls: "pickle-approval-center-table-wrap",
+			cls: "pickle-table-wrap",
 		});
 		const table = tableWrap.createEl("table", {
-			cls: "pickle-approval-center-table",
+			cls: "pickle-table",
 		});
 		const header = table.createEl("thead").createEl("tr");
 		for (const property of properties) {
-			header.createEl("th", { text: this.config.getDisplayName(property) });
+			header.createEl("th", { text: this.displayName(property) });
 		}
 		header.createEl("th", { text: "Action" });
 
@@ -120,13 +126,14 @@ export class PickleRequestsBasesView extends BasesView {
 		const allRequests = await this.service.listRequests();
 		const byVaultPath = new Map(allRequests.map((request) => [request.vaultPath, request]));
 		const orderedRows: PickleRequestRow[] = [];
+		const selectedState = this.selectedRequestState();
 
 		for (const entry of entries) {
 			const relativePath = collectionRelativePath(entry.file.path, this.service.collectionFolder);
 			if (relativePath === null) continue;
 
 			const record = byVaultPath.get(entry.file.path);
-			if (record) {
+			if (record && this.matchesSelectedState(record, selectedState)) {
 				orderedRows.push({ entry, record });
 			}
 		}
@@ -142,8 +149,8 @@ export class PickleRequestsBasesView extends BasesView {
 	): void {
 		const { record } = requestRow;
 		const row = parent.createEl("tr");
-		row.addClass("pickle-approval-center-row");
-		row.addClass(this.isAnswered(record) ? "is-answered" : "is-pending");
+		row.addClass("pickle-row");
+		row.addClass(`is-${record.derivedStatus}`);
 		row.tabIndex = 0;
 		row.addEventListener("click", (event) => {
 			if (this.eventStartedInControl(event)) return;
@@ -160,24 +167,237 @@ export class PickleRequestsBasesView extends BasesView {
 			this.renderPropertyCell(row, requestRow, property, requestType);
 		}
 		const actionCell = row.createEl("td", {
-			cls: "pickle-approval-center-action-cell",
+			cls: "pickle-action-cell",
 		});
+		actionCell.setAttr("data-label", "Action");
+		this.renderActionButton(actionCell, record);
+	}
+
+	private renderMobileList(
+		rows: PickleRequestRow[],
+		properties: BasesPropertyId[],
+		requestType: TypeDefinition | null
+	): void {
+		const list = this.containerEl.createDiv({ cls: "pickle-mobile-list" });
+		for (const row of rows) {
+			this.renderMobileCard(list, row, properties, requestType);
+		}
+	}
+
+	private renderMobileCard(
+		parent: HTMLElement,
+		requestRow: PickleRequestRow,
+		properties: BasesPropertyId[],
+		requestType: TypeDefinition | null
+	): void {
+		const { record } = requestRow;
+		const card = parent.createDiv({
+			cls: [
+				"pickle-mobile-card",
+				`is-${record.derivedStatus}`,
+			].join(" "),
+		});
+		card.tabIndex = 0;
+		card.addEventListener("click", (event) => {
+			if (this.eventStartedInControl(event)) return;
+			this.openResponseModal(record);
+		});
+		card.addEventListener("keydown", (event) => {
+			if (event.key !== "Enter" && event.key !== " ") return;
+			if (this.eventStartedInControl(event)) return;
+			event.preventDefault();
+			this.openResponseModal(record);
+		});
+
+		const titleProperty = this.mobileTitleProperty(properties, requestType);
+		const header = card.createDiv({ cls: "pickle-mobile-card-header" });
+		const main = header.createDiv({ cls: "pickle-mobile-main" });
+		const titleValue = this.propertyValue(requestRow, titleProperty);
+		const title = main.createEl("button", {
+			cls: "pickle-file-link pickle-mobile-title",
+			text: titleValue.text || record.path,
+			type: "button",
+		});
+		title.addEventListener("click", (event) => {
+			event.stopPropagation();
+			void this.openRecord(record);
+		});
+
+		const summary = this.contextTask(record);
+		if (summary.length > 0) {
+			main.createDiv({
+				cls: "pickle-mobile-summary",
+				text: summary,
+			});
+		}
+
+		this.renderActionButton(header.createDiv({ cls: "pickle-mobile-action" }), record);
+
+		const chips = card.createDiv({ cls: "pickle-mobile-chips" });
+		for (const property of properties) {
+			const key = this.propertyKey(property);
+			if (key !== "priority" && key !== "status" && key !== "kind") continue;
+			const model = this.propertyRenderModel(property, requestType);
+			const { text } = this.propertyValue(requestRow, property);
+			this.renderTypedCell(chips, record, model, text);
+		}
+		if (chips.childElementCount === 0) chips.remove();
+
+		const metaItems = [
+			this.mobileMetaText(requestRow, "source", properties, requestType),
+			this.mobileMetaText(requestRow, "created_at", properties, requestType),
+		].filter((item) => item.length > 0);
+		if (metaItems.length > 0) {
+			card.createDiv({
+				cls: "pickle-mobile-meta",
+				text: metaItems.join(" / "),
+			});
+		}
+
+		const fields = card.createDiv({ cls: "pickle-mobile-fields" });
+		for (const property of properties) {
+			if (this.isMobilePromotedProperty(property, titleProperty)) continue;
+			this.renderMobileField(fields, requestRow, property, requestType);
+		}
+		if (fields.childElementCount === 0) fields.remove();
+	}
+
+	private renderMobileField(
+		parent: HTMLElement,
+		requestRow: PickleRequestRow,
+		property: BasesPropertyId,
+		requestType: TypeDefinition | null
+	): void {
+		const model = this.propertyRenderModel(property, requestType);
+		const { text } = this.propertyValue(requestRow, property);
+		if (text.length === 0) return;
+
+		const field = parent.createDiv({
+			cls: [
+				"pickle-mobile-field",
+				`pickle-mobile-field-${this.classToken(model.key)}`,
+			].join(" "),
+		});
+		field.createDiv({
+			cls: "pickle-mobile-label",
+			text: this.displayName(property),
+		});
+		const value = field.createDiv({ cls: "pickle-mobile-value" });
+		if (this.opensRequest(property)) {
+			const button = value.createEl("button", {
+				cls: "pickle-file-link",
+				text,
+				type: "button",
+			});
+			button.addEventListener("click", (event) => {
+				event.stopPropagation();
+				void this.openRecord(requestRow.record);
+			});
+			return;
+		}
+
+		this.renderTypedCell(value, requestRow.record, model, text);
+	}
+
+	private renderActionButton(parent: HTMLElement, record: PickleRequestRecord): void {
 		const isAnswered = this.isAnswered(record);
-		const responseButton = new ButtonComponent(actionCell)
-			.setIcon(isAnswered ? "file-check" : PICKLE_ICON_ID)
-			.setTooltip(isAnswered ? "Edit response" : "Respond to request")
+		const isConflict = record.derivedStatus === "conflict";
+		const isCancelled = record.derivedStatus === "cancelled";
+		const tooltip = isConflict
+			? "Resolve multiple responses"
+			: isAnswered
+				? "Edit response"
+				: isCancelled
+					? "View cancelled request"
+					: "Respond to request";
+		const responseButton = new ButtonComponent(parent)
+			.setIcon(isAnswered ? "file-check" : isConflict ? "triangle-alert" : PICKLE_ICON_ID)
+			.setTooltip(tooltip)
 			.onClick(() => {
 				this.openResponseModal(record);
 			});
-		responseButton.buttonEl.setAttr(
-			"aria-label",
-			isAnswered ? "Edit response" : "Respond to request"
-		);
-		responseButton.buttonEl.addClass("pickle-approval-center-action-button");
-		if (!isAnswered) responseButton.buttonEl.addClass("mod-cta");
+		responseButton.buttonEl.setAttr("aria-label", tooltip);
+		responseButton.buttonEl.addClass("pickle-action-button");
+		if (record.derivedStatus === "pending") responseButton.buttonEl.addClass("mod-cta");
 		responseButton.buttonEl.addEventListener("click", (event) => {
 			event.stopPropagation();
 		});
+	}
+
+	private mobileTitleProperty(
+		properties: BasesPropertyId[],
+		requestType: TypeDefinition | null
+	): BasesPropertyId {
+		return (
+			properties.find((property) => this.propertyRenderModel(property, requestType).isDisplayName) ??
+			this.propertyWithKey(properties, "title") ??
+			this.propertyWithKey(properties, "file.name") ??
+			"note.title"
+		);
+	}
+
+	private mobileMetaText(
+		requestRow: PickleRequestRow,
+		key: string,
+		properties: BasesPropertyId[],
+		requestType: TypeDefinition | null
+	): string {
+		const property = this.propertyWithKey(properties, key);
+		if (!property) return "";
+
+		const model = this.propertyRenderModel(property, requestType);
+		const { text } = this.propertyValue(requestRow, property);
+		if (text.length === 0) return "";
+		if (model.definition?.type === "datetime") return this.formatDate(text);
+		return text;
+	}
+
+	private isMobilePromotedProperty(
+		property: BasesPropertyId,
+		titleProperty: BasesPropertyId
+	): boolean {
+		if (property === titleProperty) return true;
+		const key = this.propertyKey(property);
+		return (
+			key === "title" ||
+			key === "priority" ||
+			key === "status" ||
+			key === "kind" ||
+			key === "source" ||
+			key === "created_at"
+		);
+	}
+
+	private propertyWithKey(
+		properties: BasesPropertyId[],
+		key: string
+	): BasesPropertyId | undefined {
+		return properties.find((property) => this.propertyKey(property) === key);
+	}
+
+	private displayName(property: BasesPropertyId): string {
+		const key = this.propertyKey(property);
+		const configured = this.config.getDisplayName(property).trim();
+		if (configured.length > 0 && configured !== property && configured !== key) {
+			if (key !== "file.name" || configured !== "file name") return configured;
+		}
+
+		if (key === "file.name") return "File";
+		const label = key.replace(/[_-]+/gu, " ");
+		return label.charAt(0).toUpperCase() + label.slice(1);
+	}
+
+	private propertyValue(
+		requestRow: PickleRequestRow,
+		property: BasesPropertyId
+	): { value: Value | null; fallback: string; text: string } {
+		const value = requestRow.entry.getValue(property);
+		const fallback = this.recordPropertyValue(requestRow.record, property);
+		return {
+			value,
+			fallback,
+			text: this.valueText(value, fallback),
+		};
 	}
 
 	private visibleProperties(): BasesPropertyId[] {
@@ -194,14 +414,13 @@ export class PickleRequestsBasesView extends BasesView {
 		const model = this.propertyRenderModel(property, requestType);
 		const cell = parent.createEl("td", {
 			cls: [
-				"pickle-approval-center-cell",
-				`pickle-approval-center-cell-${this.classToken(model.key)}`,
-				`pickle-approval-center-cell-type-${this.classToken(model.definition?.type ?? "unknown")}`,
+				"pickle-cell",
+				`pickle-cell-${this.classToken(model.key)}`,
+				`pickle-cell-type-${this.classToken(model.definition?.type ?? "unknown")}`,
 			].join(" "),
 		});
-		const value = requestRow.entry.getValue(property);
-		const fallback = this.recordPropertyValue(requestRow.record, property);
-		const text = this.valueText(value, fallback);
+		cell.setAttr("data-label", this.displayName(property));
+		const { text } = this.propertyValue(requestRow, property);
 
 		if (model.isDisplayName) {
 			this.renderTitleCell(cell, requestRow, text);
@@ -210,7 +429,7 @@ export class PickleRequestsBasesView extends BasesView {
 
 		if (this.opensRequest(property)) {
 			const button = cell.createEl("button", {
-				cls: "pickle-approval-center-file-link",
+				cls: "pickle-file-link",
 				text,
 				type: "button",
 			});
@@ -239,7 +458,7 @@ export class PickleRequestsBasesView extends BasesView {
 				return;
 			case "datetime":
 				parent.createSpan({
-					cls: "pickle-approval-center-date",
+					cls: "pickle-date",
 					text: this.formatDate(text),
 				});
 				return;
@@ -249,7 +468,7 @@ export class PickleRequestsBasesView extends BasesView {
 			case "integer":
 			case "number":
 				parent.createSpan({
-					cls: "pickle-approval-center-number",
+					cls: "pickle-number",
 					text,
 				});
 				return;
@@ -261,7 +480,7 @@ export class PickleRequestsBasesView extends BasesView {
 				return;
 			default:
 				parent.createSpan({
-					cls: "pickle-approval-center-text-value",
+					cls: "pickle-text-value",
 					text,
 				});
 		}
@@ -272,9 +491,9 @@ export class PickleRequestsBasesView extends BasesView {
 		requestRow: PickleRequestRow,
 		title: string
 	): void {
-		const titleStack = parent.createDiv({ cls: "pickle-approval-center-title-stack" });
+		const titleStack = parent.createDiv({ cls: "pickle-title-stack" });
 		const button = titleStack.createEl("button", {
-			cls: "pickle-approval-center-file-link pickle-approval-center-title-link",
+			cls: "pickle-file-link pickle-title-link",
 			text: title || requestRow.record.path,
 			type: "button",
 		});
@@ -294,7 +513,7 @@ export class PickleRequestsBasesView extends BasesView {
 		].filter((item) => item.length > 0);
 		if (details.length > 0) {
 			titleStack.createDiv({
-				cls: "pickle-approval-center-title-meta",
+				cls: "pickle-title-meta",
 				text: details.join(" / "),
 			});
 		}
@@ -304,9 +523,9 @@ export class PickleRequestsBasesView extends BasesView {
 		const normalized = value.trim().length > 0 ? value.trim() : "unknown";
 		parent.createSpan({
 			cls: [
-				"pickle-approval-center-pill",
-				`pickle-approval-center-pill-${this.classToken(fieldName)}`,
-				`pickle-approval-center-pill-${this.classToken(fieldName)}-${this.classToken(normalized)}`,
+				"pickle-pill",
+				`pickle-pill-${this.classToken(fieldName)}`,
+				`pickle-pill-${this.classToken(fieldName)}-${this.classToken(normalized)}`,
 			].join(" "),
 			text: normalized,
 		});
@@ -321,17 +540,17 @@ export class PickleRequestsBasesView extends BasesView {
 					.filter((item) => item.length > 0);
 
 		if (items.length === 0) {
-			parent.createSpan({ cls: "pickle-approval-center-text-value is-empty", text: "None" });
+			parent.createSpan({ cls: "pickle-text-value is-empty", text: "None" });
 			return;
 		}
 
-		const list = parent.createDiv({ cls: "pickle-approval-center-list-value" });
+		const list = parent.createDiv({ cls: "pickle-list-value" });
 		for (const item of items.slice(0, 3)) {
-			list.createSpan({ cls: "pickle-approval-center-list-item", text: item });
+			list.createSpan({ cls: "pickle-list-item", text: item });
 		}
 		if (items.length > 3) {
 			list.createSpan({
-				cls: "pickle-approval-center-list-more",
+				cls: "pickle-list-more",
 				text: `+${items.length - 3}`,
 			});
 		}
@@ -344,7 +563,7 @@ export class PickleRequestsBasesView extends BasesView {
 		fallback: string
 	): void {
 		if (!value || typeof value !== "object" || Array.isArray(value)) {
-			parent.createSpan({ cls: "pickle-approval-center-text-value", text: fallback });
+			parent.createSpan({ cls: "pickle-text-value", text: fallback });
 			return;
 		}
 
@@ -353,23 +572,23 @@ export class PickleRequestsBasesView extends BasesView {
 		const keys = preferredKeys.length > 0 ? preferredKeys : Object.keys(objectValue);
 		const firstKey = keys.find((key) => objectValue[key] !== undefined);
 		if (!firstKey) {
-			parent.createSpan({ cls: "pickle-approval-center-text-value is-empty", text: "Empty" });
+			parent.createSpan({ cls: "pickle-text-value is-empty", text: "Empty" });
 			return;
 		}
 
 		const visibleKeys = Object.keys(objectValue).filter((key) => objectValue[key] !== undefined);
-		const preview = parent.createSpan({ cls: "pickle-approval-center-object-value" });
+		const preview = parent.createSpan({ cls: "pickle-object-value" });
 		preview.createSpan({
-			cls: "pickle-approval-center-object-key",
+			cls: "pickle-object-key",
 			text: `${firstKey}: `,
 		});
 		preview.createSpan({
-			cls: "pickle-approval-center-object-preview",
+			cls: "pickle-object-preview",
 			text: String(objectValue[firstKey]),
 		});
 		if (visibleKeys.length > 1) {
 			preview.createSpan({
-				cls: "pickle-approval-center-object-more",
+				cls: "pickle-object-more",
 				text: ` +${visibleKeys.length - 1}`,
 			});
 		}
@@ -394,6 +613,7 @@ export class PickleRequestsBasesView extends BasesView {
 		}
 
 		const key = property.includes(".") ? property.split(".").slice(1).join(".") : property;
+		if (key === "status") return record.derivedStatus;
 		const value = record.frontmatter[key];
 		if (typeof value === "string") return value;
 		if (typeof value === "number" || typeof value === "boolean") return String(value);
@@ -425,16 +645,15 @@ export class PickleRequestsBasesView extends BasesView {
 	}
 
 	private isAnswered(record: PickleRequestRecord): boolean {
-		return record.answered || this.stringValue(record.frontmatter.status).toLowerCase() === "answered";
+		return record.derivedStatus === "answered";
 	}
 
-	private statusFor(record: PickleRequestRecord, fallback: string): string {
-		if (this.isAnswered(record)) return "answered";
-		return fallback.trim().length > 0 ? fallback : "pending";
+	private statusFor(record: PickleRequestRecord): string {
+		return record.derivedStatus;
 	}
 
 	private enumText(record: PickleRequestRecord, key: string, fallback: string): string {
-		if (key === "status") return this.statusFor(record, fallback);
+		if (key === "status") return this.statusFor(record);
 		return fallback.trim().length > 0 ? fallback : "unknown";
 	}
 
@@ -456,8 +675,23 @@ export class PickleRequestsBasesView extends BasesView {
 		}).format(date);
 	}
 
-	private stringValue(value: unknown): string {
-		return typeof value === "string" ? value : "";
+	private selectedRequestState(): PickleRequestViewState {
+		const configured = this.config.get("state");
+		if (isRequestViewState(configured)) return configured;
+
+		const name = this.config.name.toLowerCase();
+		if (name.includes("pending")) return "pending";
+		if (name.includes("answered")) return "answered";
+		if (name.includes("conflict")) return "conflict";
+		if (name.includes("cancelled")) return "cancelled";
+		return "all";
+	}
+
+	private matchesSelectedState(
+		record: PickleRequestRecord,
+		selectedState: PickleRequestViewState
+	): boolean {
+		return selectedState === "all" || record.derivedStatus === selectedState;
 	}
 
 	private classToken(value: string): string {
@@ -477,5 +711,30 @@ export function createBasesViewRegistration(
 		icon: PICKLE_ICON_ID,
 		factory: (controller, containerEl) =>
 			new PickleRequestsBasesView(controller, containerEl, service),
+		options: (): BasesAllOptions[] => [
+			{
+				key: "state",
+				type: "dropdown",
+				displayName: "Request state",
+				default: "all",
+				options: {
+					all: "All",
+					pending: "Pending",
+					answered: "Answered",
+					conflict: "Conflict",
+					cancelled: "Cancelled",
+				},
+			},
+		],
 	};
+}
+
+function isRequestViewState(value: unknown): value is PickleRequestViewState {
+	return (
+		value === "all" ||
+		value === "pending" ||
+		value === "answered" ||
+		value === "conflict" ||
+		value === "cancelled"
+	);
 }

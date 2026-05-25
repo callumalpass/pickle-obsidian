@@ -17,7 +17,7 @@ export class PickleSettingsTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Collection folder")
-			.setDesc("Vault folder that contains the mdbase pickle collection.")
+			.setDesc("Vault folder that contains request and response files.")
 			.addText((text) =>
 				text
 					.setValue(this.plugin.settings.collectionFolder)

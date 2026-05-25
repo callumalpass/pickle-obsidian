@@ -118,24 +118,19 @@ export class PickleResponseModal extends Modal {
 		this.renderAttachments(responsePane);
 
 		const footer = this.contentEl.createDiv({ cls: "pickle-response-modal-footer" });
-		new Setting(footer)
-			.setClass("pickle-response-modal-actions")
-			.addButton((button) => {
-				button
-					.setButtonText("Cancel")
-					.setTooltip("Close without saving a response")
-					.onClick(() => {
-						if (!this.isSubmitting) this.close();
-					});
-			})
-			.addButton((button) => {
-				button
-					.setButtonText(this.existingResponse ? "Update response" : "Create response")
-					.setCta()
-					.setTooltip(this.existingResponse ? "Update response file" : "Create response file")
-					.onClick(() => {
-						void this.submit();
-					});
+		const actions = footer.createDiv({ cls: "pickle-response-modal-actions" });
+		new ButtonComponent(actions)
+			.setButtonText("Cancel")
+			.setTooltip("Close without saving a response")
+			.onClick(() => {
+				if (!this.isSubmitting) this.close();
+			});
+		new ButtonComponent(actions)
+			.setButtonText(this.existingResponse ? "Update response" : "Create response")
+			.setCta()
+			.setTooltip(this.existingResponse ? "Update response file" : "Create response file")
+			.onClick(() => {
+				void this.submit();
 			});
 	}
 
@@ -164,7 +159,7 @@ export class PickleResponseModal extends Modal {
 		const contextItems = [
 			this.metaPair("Kind", this.request.frontmatter.kind),
 			this.metaPair("Priority", this.request.frontmatter.priority),
-			this.metaPair("Status", this.request.frontmatter.status),
+			this.metaPair("State", this.request.derivedStatus),
 			this.metaPair("Response type", this.request.frontmatter.response_type),
 		].filter((item) => item.length > 0);
 
@@ -177,7 +172,9 @@ export class PickleResponseModal extends Modal {
 
 		this.renderStructuredContext(parent);
 
-		const body = this.stringValue(this.request.body, "");
+		const body =
+			this.stringValue(this.request.body, "") ||
+			this.stringValue(this.request.frontmatter.message, "");
 		if (body.length > 0) {
 			const details = parent.createEl("details", {
 				cls: "pickle-response-modal-context-details",

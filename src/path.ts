@@ -1,5 +1,3 @@
-import posixPath from "node:path/posix";
-
 export function normalizeVaultPath(value: string): string {
 	return value
 		.replace(/\\/gu, "/")
@@ -60,7 +58,8 @@ export function uniqueTimestamp(date = new Date()): string {
 }
 
 export function safeAttachmentName(name: string): string {
-	const basename = posixPath.basename(name.replace(/\\/gu, "/"));
+	const normalized = name.replace(/\\/gu, "/");
+	const basename = normalized.split("/").pop() ?? normalized;
 	const safe = basename.replace(/[^A-Za-z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "");
 	return safe.length > 0 ? safe : "attachment.bin";
 }
