@@ -306,3 +306,26 @@ After copying, reload in Obsidian:
 obsidian plugin:reload id=pickle
 obsidian dev:errors limit=20
 ```
+
+## Release
+
+The build workflow runs linting, typechecking, tests, a production build, and
+release metadata checks. It uploads the Obsidian install assets as a workflow
+artifact:
+
+- `main.js`
+- `manifest.json`
+- `styles.css`
+
+To publish a GitHub release for Obsidian, update `manifest.json`,
+`package.json`, `versions.json`, and `CHANGELOG.md`, then push a tag that exactly
+matches the manifest version:
+
+```bash
+git tag 0.1.0
+git push origin 0.1.0
+```
+
+The workflow publishes or updates the matching GitHub Release with the three
+plugin assets. Use plain semver tags such as `0.1.0`; do not prefix release tags
+with `v`.
