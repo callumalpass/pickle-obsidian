@@ -113,34 +113,42 @@ afterEach(async () => {
 	tempRoots = [];
 });
 
-describe.skipIf(!existsSync(SPEC_ROOT))("mdbase spec compatibility", () => {
-	for (const [relativeSpecPath, selectedGroups] of Object.entries(SELECTED_SPEC_CASES)) {
-		const specPath = join(SPEC_ROOT, relativeSpecPath);
-		const document = parse(readTextSync(specPath)) as SpecDocument;
+if (!existsSync(SPEC_ROOT)) {
+	describe.skip("mdbase spec compatibility", () => {
+		it("requires the sibling mdbase-spec repository", () => {
+			expect(SPEC_ROOT).toBeTruthy();
+		});
+	});
+} else {
+	describe("mdbase spec compatibility", () => {
+		for (const [relativeSpecPath, selectedGroups] of Object.entries(SELECTED_SPEC_CASES)) {
+			const specPath = join(SPEC_ROOT, relativeSpecPath);
+			const document = parse(readTextSync(specPath)) as SpecDocument;
 
-		for (const group of document.groups ?? []) {
-			const selectedTests = selectedGroups[group.name];
-			if (!selectedTests) continue;
+			for (const group of document.groups ?? []) {
+				const selectedTests = selectedGroups[group.name];
+				if (!selectedTests) continue;
 
-			for (const testCase of group.tests ?? []) {
-				if (!selectedTests.includes(testCase.name)) continue;
+				for (const testCase of group.tests ?? []) {
+					if (!selectedTests.includes(testCase.name)) continue;
 
-				it(`${relativeSpecPath}: ${group.name} > ${testCase.name}`, async () => {
-					const root = await createTempVault();
-					const setup = mergeSetup(
-						mergeSetup(document.setup, group.setup),
-						testCase.setup
-					);
-					await setupCollection(root, setup);
+					it(`${relativeSpecPath}: ${group.name} > ${testCase.name}`, async () => {
+						const root = await createTempVault();
+						const setup = mergeSetup(
+							mergeSetup(document.setup, group.setup),
+							testCase.setup
+						);
+						await setupCollection(root, setup);
 
-					const collection = new VaultCollection(createFakeApp(root), COLLECTION_FOLDER);
-					const result = await runOperation(collection, root, testCase);
-					assertExpectation(testCase.expect ?? {}, result);
-				});
+						const collection = new VaultCollection(createFakeApp(root), COLLECTION_FOLDER);
+						const result = await runOperation(collection, root, testCase);
+						assertExpectation(testCase.expect ?? {}, result);
+					});
+				}
 			}
 		}
-	}
-});
+	});
+}
 
 function readTextSync(path: string): string {
 	return existsSync(path) ? readFileSync(path, "utf8") : "";
