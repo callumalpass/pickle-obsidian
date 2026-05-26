@@ -23,4 +23,5 @@ Versioning.
 - Request-state derivation from linked response files.
 - Commands for maintaining the collection, validating the collection, opening the
   request base, and responding to the active request.
-- Release-ready build checks, MIT license, and generated Obsidian plugin assets.
+- Release-ready build checks, GitHub artifact attestations, MIT license, and
+  generated Obsidian plugin assets.

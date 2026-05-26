@@ -11,6 +11,8 @@ on:
 
 permissions:
   contents: read
+  id-token: write
+  attestations: write
 
 jobs:
   build:
@@ -91,6 +93,15 @@ jobs:
             process.exit(1);
           }
           NODE
+
+      - name: Generate artifact attestations
+        if: github.event_name != 'pull_request'
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            main.js
+            manifest.json
+            styles.css
 
       - name: Upload Obsidian plugin assets
         uses: actions/upload-artifact@v4

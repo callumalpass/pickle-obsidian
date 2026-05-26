@@ -309,9 +309,9 @@ obsidian dev:errors limit=20
 
 ## Release
 
-The build workflow runs linting, typechecking, tests, a production build, and
-release metadata checks. It uploads the Obsidian install assets as a workflow
-artifact:
+The build workflow runs linting, typechecking, tests, a production build,
+release metadata checks, and GitHub artifact attestations for the Obsidian
+install assets. It uploads these assets as a workflow artifact:
 
 - `main.js`
 - `manifest.json`
