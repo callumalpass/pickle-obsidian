@@ -38,6 +38,23 @@ its own workflow state, and leave the Pickle files intact.
   answered by mutating `status`.
 - Uses a small custom Pickle icon in commands and request actions.
 
+## Related Projects
+
+Pickle works fine as a standalone Obsidian plugin, but can also be used with these related projects:
+
+- [Pickle](https://github.com/callumalpass/pickle): the local server, CLI, API,
+  and collection-backed inbox.
+- [Pickle Android](https://github.com/callumalpass/pickle-android): the mobile
+  client for reviewing and answering Pickle requests.
+- [Pickle Obsidian skill](https://github.com/callumalpass/pickle-obsidian-skill):
+  agent-facing instructions for creating and consuming Obsidian Pickle requests.
+- [mdbase spec](https://github.com/callumalpass/mdbase-spec): the typed
+  Markdown collection contract behind the `_pickle` schema.
+- [mdbase](https://github.com/callumalpass/mdbase): the TypeScript mdbase
+  implementation used by related tooling.
+- [Tickle](https://github.com/callumalpass/tickle): the lightweight scheduler
+  used by local automations that can create Pickle requests.
+
 ## Requirements
 
 - Obsidian `1.12.2` or newer.
