@@ -1,4 +1,5 @@
 import { TFile, type App } from "obsidian";
+import { parse } from "yaml";
 import { parseMarkdown, markdownWithFrontmatter } from "./frontmatter";
 import {
 	collectionRelativePath,
@@ -47,10 +48,15 @@ export interface VaultCollectionValidationResult {
 	issues: ValidationIssue[];
 }
 
+interface CollectionSettings {
+	exclude: string[];
+}
+
 export class VaultCollection {
 	private readonly app: App;
 	private readonly collectionFolder: string;
 	private typeDefinitions: Map<string, TypeDefinition> | null = null;
+	private settings: CollectionSettings | null = null;
 
 	constructor(app: App, collectionFolder: string) {
 		this.app = app;
@@ -206,7 +212,7 @@ export class VaultCollection {
 		applyDefaults = true
 	): Promise<VaultCollectionRow[]> {
 		const rows: VaultCollectionRow[] = [];
-		for (const file of this.markdownFiles()) {
+		for (const file of await this.markdownFiles()) {
 			const relativePath = collectionRelativePath(file.path, this.collectionFolder);
 			if (relativePath === null || relativePath.length === 0) continue;
 			const parsed = parseMarkdown(await this.app.vault.cachedRead(file));
@@ -217,13 +223,41 @@ export class VaultCollection {
 		return rows;
 	}
 
-	private markdownFiles(): TFile[] {
+	private async markdownFiles(): Promise<TFile[]> {
 		const vaultWithMarkdownFiles = this.app.vault as typeof this.app.vault & {
 			getMarkdownFiles?: () => TFile[];
 		};
+		const settings = await this.readCollectionSettings();
 		return (vaultWithMarkdownFiles.getMarkdownFiles?.() ?? []).filter(
-			(file) => collectionRelativePath(file.path, this.collectionFolder) !== null
+			(file) => {
+				const relativePath = collectionRelativePath(file.path, this.collectionFolder);
+				return (
+					relativePath !== null &&
+					relativePath.length > 0 &&
+					!isExcludedPath(relativePath, settings.exclude)
+				);
+			}
 		);
+	}
+
+	private async readCollectionSettings(): Promise<CollectionSettings> {
+		if (this.settings) return this.settings;
+
+		const configPath = vaultPathForCollectionPath(this.collectionFolder, "mdbase.yaml");
+		const file = this.app.vault.getAbstractFileByPath(configPath);
+		if (!(file instanceof TFile)) {
+			this.settings = { exclude: [] };
+			return this.settings;
+		}
+
+		const config: unknown = parse(await this.app.vault.cachedRead(file));
+		const settings = asRecord(asRecord(config).settings);
+		const exclude = Array.isArray(settings.exclude)
+			? settings.exclude.filter((item): item is string => typeof item === "string")
+			: [];
+
+		this.settings = { exclude };
+		return this.settings;
 	}
 
 	private async rowForParsedMarkdown(
@@ -520,7 +554,7 @@ export class VaultCollection {
 		if (this.typeDefinitions) return this.typeDefinitions;
 
 		const definitions = new Map<string, TypeDefinition>();
-		for (const file of this.markdownFiles()) {
+		for (const file of await this.markdownFiles()) {
 			const relativePath = collectionRelativePath(file.path, this.collectionFolder);
 			if (!relativePath?.startsWith("_types/")) continue;
 			const parsed = parseMarkdown(await this.app.vault.cachedRead(file));
@@ -614,4 +648,43 @@ export class VaultCollection {
 		const parts = field.split(".");
 		return parts[parts.length - 1]?.replace(/\[\d+\]$/u, "") ?? field;
 	}
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+	return value !== null && typeof value === "object" && !Array.isArray(value)
+		? (value as Record<string, unknown>)
+		: {};
+}
+
+function isExcludedPath(relativePath: string, patterns: string[]): boolean {
+	const normalizedPath = normalizeVaultPath(relativePath);
+	return patterns.some((pattern) => matchesExcludePattern(normalizedPath, pattern));
+}
+
+function matchesExcludePattern(relativePath: string, pattern: string): boolean {
+	const normalizedPattern = normalizeVaultPath(pattern);
+	if (normalizedPattern.length === 0) return false;
+
+	if (normalizedPattern.endsWith("/**")) {
+		const prefix = normalizedPattern.slice(0, -3);
+		return relativePath === prefix || relativePath.startsWith(`${prefix}/`);
+	}
+
+	if (!normalizedPattern.includes("*")) {
+		return (
+			relativePath === normalizedPattern ||
+			relativePath.startsWith(`${normalizedPattern}/`)
+		);
+	}
+
+	const escaped = normalizedPattern
+		.split("**")
+		.map((part) =>
+			part
+				.split("*")
+				.map((segment) => segment.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"))
+				.join("[^/]*")
+		)
+		.join(".*");
+	return new RegExp(`^${escaped}$`, "u").test(relativePath);
 }

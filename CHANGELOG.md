@@ -5,6 +5,14 @@ All notable changes to Pickle are documented in this file.
 The format is based on Keep a Changelog, and this project follows Semantic
 Versioning.
 
+## [0.1.1] - 2026-06-01
+
+### Fixed
+
+- Honor `mdbase.yaml` exclude rules when scanning collection markdown, so
+  attachment files under `attachments/**` cannot break Pickle request base
+  views.
+
 ## [0.1.0] - 2026-05-26
 
 ### Added

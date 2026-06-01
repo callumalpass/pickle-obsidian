@@ -1,6 +1,6 @@
 {
 	"name": "pickle",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Local-first, file-based agent inbox for Obsidian.",
 	"type": "module",
 	"main": "main.js",

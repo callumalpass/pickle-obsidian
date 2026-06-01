@@ -97,6 +97,37 @@ describe("vault collection contract", () => {
 		).toBe(true);
 	});
 
+	it("honors mdbase exclude globs when scanning markdown files", async () => {
+		const root = await createCollectionRoot();
+		await writeFile(
+			join(root, COLLECTION_FOLDER, "requests", "approve-build.md"),
+			[
+				"---",
+				`type: ${REQUEST_TYPE}`,
+				"title: Approve build",
+				`response_type: ${DEFAULT_APPROVAL_RESPONSE_TYPE}`,
+				"---",
+				"",
+			].join("\n")
+		);
+		await mkdir(join(root, COLLECTION_FOLDER, "attachments", "approve-build"), {
+			recursive: true,
+		});
+		await writeFile(
+			join(root, COLLECTION_FOLDER, "attachments", "approve-build", "context.md"),
+			["---", "title: 'unterminated", "", "---", ""].join("\n")
+		);
+
+		const collection = new VaultCollection(createFakeApp(root), COLLECTION_FOLDER);
+		const query = await collection.query({ types: [REQUEST_TYPE] });
+		const validation = await collection.validate();
+
+		expect(query.error).toBeUndefined();
+		expect(query.results).toHaveLength(1);
+		expect(query.results?.[0]?.path).toBe("requests/approve-build.md");
+		expect(validation.valid).toBe(true);
+	});
+
 	it("rejects responses that do not satisfy their response type", async () => {
 		const root = await createCollectionRoot();
 		const collection = new VaultCollection(createFakeApp(root), COLLECTION_FOLDER);
