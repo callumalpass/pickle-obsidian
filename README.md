@@ -166,40 +166,42 @@ nested review metadata:
 
 ```yaml
 ---
+kind: mdbase.type
 name: pickle_response_complex
+version: 1
 description: Complex approval response.
-display_name_key: decision
-fields:
-  request:
-    type: link
-    target: pickle_request
-    validate_exists: true
-    required: true
-  decision:
-    type: enum
-    values: [approve, reject, revise]
-    required: true
-  risk_accepted:
-    type: boolean
-    required: true
-  rollout_steps:
-    type: list
-    items:
-      type: string
-    min_items: 2
-  review:
+schema:
+  dialect: json-schema-2020-12
+  value:
     type: object
-    fields:
-      summary:
-        type: string
-        required: true
-      severity:
-        type: enum
-        values: [low, medium, high]
-  comment:
-    type: string
+    required: [request, decision, risk_accepted]
+    properties:
+      request: { type: string }
+      decision: { enum: [approve, reject, revise] }
+      risk_accepted: { type: boolean }
+      rollout_steps:
+        type: array
+        minItems: 2
+        items: { type: string }
+      review:
+        type: object
+        required: [summary]
+        properties:
+          summary: { type: string }
+          severity: { enum: [low, medium, high] }
+      comment: { type: string }
+collection:
+  display:
+    name_field: decision
+  links:
+    request:
+      target_type: pickle_request
+      validate_exists: true
 ---
 ```
+
+New Pickle collections use mdbase v0.3. The plugin continues to read and maintain
+existing v0.2 collections without rewriting their type grammar.
 
 The modal renders editable fields recursively:
 

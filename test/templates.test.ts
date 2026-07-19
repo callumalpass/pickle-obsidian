@@ -9,11 +9,14 @@ import {
 import { parseMarkdown } from "../src/frontmatter";
 import {
 	MDBASE_CONFIG,
+	MDBASE_CONFIG_V02,
 	PICKLE_ACK_RESPONSE_TYPE,
 	PICKLE_APPROVAL_RESPONSE_TYPE,
 	PICKLE_REQUEST_TYPE,
+	PICKLE_REQUEST_TYPE_V02,
 	defaultBaseFile,
 } from "../src/templates";
+import { normalizeTypeDefinition } from "../src/typeDefinition";
 
 interface BaseViewConfig {
 	type: string;
@@ -36,22 +39,24 @@ interface BaseFileConfig {
 describe("default templates", () => {
 	it("uses Pickle as the collection name", () => {
 		const collectionConfig = parse(MDBASE_CONFIG) as {
+			spec_version?: string;
 			name?: string;
 			description?: string;
 			settings?: Record<string, unknown>;
 		};
 
 		expect(collectionConfig.name).toBe("Pickle");
+		expect(collectionConfig.spec_version).toBe("0.3.0");
 		expect(collectionConfig.description).toContain("Pickle requests");
 		expect(collectionConfig.settings).toMatchObject({
 			types_folder: "_types",
-			default_validation: "error",
-			default_strict: false,
+			record_extensions: ["md"],
+			validation: "error",
 			exclude: [".git", "node_modules", ".mdbase", "attachments/**"],
 			include_subfolders: true,
 			explicit_type_keys: ["type", "types"],
-			cache_folder: ".mdbase",
 		});
+		expect((parse(MDBASE_CONFIG_V02) as { spec_version?: string }).spec_version).toBe("0.2.1");
 	});
 
 	it("maintains Bases request views without hiding responses globally", () => {
@@ -124,9 +129,7 @@ describe("default templates", () => {
 			PICKLE_APPROVAL_RESPONSE_TYPE,
 			PICKLE_ACK_RESPONSE_TYPE,
 		]) {
-			const parsed = parseMarkdown(typeFile).frontmatter as {
-				fields?: Record<string, Record<string, unknown>>;
-			};
+			const parsed = normalizeTypeDefinition(parseMarkdown(typeFile).frontmatter);
 			for (const field of Object.values(parsed.fields ?? {})) {
 				expect(field).not.toHaveProperty("default");
 			}
@@ -134,22 +137,25 @@ describe("default templates", () => {
 	});
 
 	it("adds message request and acknowledgement response type fields", () => {
-		const request = parseMarkdown(PICKLE_REQUEST_TYPE).frontmatter as {
-			fields?: Record<string, { values?: string[]; type?: string }>;
-		};
-		const acknowledgement = parseMarkdown(PICKLE_ACK_RESPONSE_TYPE).frontmatter as {
-			name?: string;
-			fields?: Record<string, { type?: string; target?: string; validate_exists?: boolean }>;
-		};
+		const request = normalizeTypeDefinition(parseMarkdown(PICKLE_REQUEST_TYPE).frontmatter);
+		const acknowledgement = normalizeTypeDefinition(
+			parseMarkdown(PICKLE_ACK_RESPONSE_TYPE).frontmatter
+		);
 
 		expect(request.fields?.message?.type).toBe("string");
 		expect(request.fields?.kind?.values).toContain("message");
 		expect(acknowledgement.name).toBe(DEFAULT_ACK_RESPONSE_TYPE);
 		expect(acknowledgement.fields?.request).toMatchObject({
 			type: "link",
-			target: REQUEST_TYPE,
+			target_type: REQUEST_TYPE,
 			validate_exists: true,
 		});
 		expect(acknowledgement.fields?.message?.type).toBe("string");
+	});
+
+	it("retains explicit v0.2 type templates for existing collections", () => {
+		const request = parseMarkdown(PICKLE_REQUEST_TYPE_V02).frontmatter;
+		expect(request.kind).toBeUndefined();
+		expect(request.fields).toBeTypeOf("object");
 	});
 });

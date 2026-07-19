@@ -27,6 +27,7 @@
 	"author": "Callum Alpass",
 	"license": "MIT",
 	"dependencies": {
+		"ulid": "^2.3.0",
 		"yaml": "^2.8.1"
 	},
 	"devDependencies": {
@@ -40,7 +41,7 @@
 		"eslint-plugin-obsidianmd": "^0.3.0",
 		"globals": "^16.5.0",
 		"obsidian": "latest",
-		"obsidian-typings": "^3.16.0",
+		"obsidian-typings": "^6.24.0",
 		"stylelint": "^16.26.0",
 		"typescript": "^5.9.3",
 		"vitest": "^4.0.13"

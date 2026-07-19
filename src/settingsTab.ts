@@ -2,11 +2,11 @@ import { Notice, PluginSettingTab, Setting, type App } from "obsidian";
 import type PicklePlugin from "../main";
 
 export class PickleSettingsTab extends PluginSettingTab {
-	private readonly plugin: PicklePlugin;
+	private readonly picklePlugin: PicklePlugin;
 
 	constructor(app: App, plugin: PicklePlugin) {
 		super(app, plugin);
-		this.plugin = plugin;
+		this.picklePlugin = plugin;
 	}
 
 	override display(): void {
@@ -20,10 +20,10 @@ export class PickleSettingsTab extends PluginSettingTab {
 			.setDesc("Vault folder that contains request and response files.")
 			.addText((text) =>
 				text
-					.setValue(this.plugin.settings.collectionFolder)
+					.setValue(this.picklePlugin.settings.collectionFolder)
 					.onChange((value) => {
-						this.plugin.settings.collectionFolder = value.trim() || "_pickle";
-						void this.plugin.saveSettings();
+						this.picklePlugin.settings.collectionFolder = value.trim() || "_pickle";
+						void this.picklePlugin.saveSettings();
 					})
 			);
 
@@ -32,10 +32,10 @@ export class PickleSettingsTab extends PluginSettingTab {
 			.setDesc("Folder inside the collection for request files.")
 			.addText((text) =>
 				text
-					.setValue(this.plugin.settings.requestsFolder)
+					.setValue(this.picklePlugin.settings.requestsFolder)
 					.onChange((value) => {
-						this.plugin.settings.requestsFolder = value.trim() || "requests";
-						void this.plugin.saveSettings();
+						this.picklePlugin.settings.requestsFolder = value.trim() || "requests";
+						void this.picklePlugin.saveSettings();
 					})
 			);
 
@@ -44,10 +44,10 @@ export class PickleSettingsTab extends PluginSettingTab {
 			.setDesc("Folder inside the collection for response files.")
 			.addText((text) =>
 				text
-					.setValue(this.plugin.settings.responsesFolder)
+					.setValue(this.picklePlugin.settings.responsesFolder)
 					.onChange((value) => {
-						this.plugin.settings.responsesFolder = value.trim() || "responses";
-						void this.plugin.saveSettings();
+						this.picklePlugin.settings.responsesFolder = value.trim() || "responses";
+						void this.picklePlugin.saveSettings();
 					})
 			);
 
@@ -56,10 +56,10 @@ export class PickleSettingsTab extends PluginSettingTab {
 			.setDesc("Folder inside the collection for copied response attachments.")
 			.addText((text) =>
 				text
-					.setValue(this.plugin.settings.attachmentsFolder)
+					.setValue(this.picklePlugin.settings.attachmentsFolder)
 					.onChange((value) => {
-						this.plugin.settings.attachmentsFolder = value.trim() || "attachments";
-						void this.plugin.saveSettings();
+						this.picklePlugin.settings.attachmentsFolder = value.trim() || "attachments";
+						void this.picklePlugin.saveSettings();
 					})
 			);
 
@@ -68,10 +68,10 @@ export class PickleSettingsTab extends PluginSettingTab {
 			.setDesc("Base file maintained inside the collection.")
 			.addText((text) =>
 				text
-					.setValue(this.plugin.settings.baseFile)
+					.setValue(this.picklePlugin.settings.baseFile)
 					.onChange((value) => {
-						this.plugin.settings.baseFile = value.trim() || "Pickle Requests.base";
-						void this.plugin.saveSettings();
+						this.picklePlugin.settings.baseFile = value.trim() || "Pickle Requests.base";
+						void this.picklePlugin.saveSettings();
 					})
 			);
 
@@ -80,10 +80,10 @@ export class PickleSettingsTab extends PluginSettingTab {
 			.setDesc("Value written to the responder field on response files.")
 			.addText((text) =>
 				text
-					.setValue(this.plugin.settings.defaultResponder)
+					.setValue(this.picklePlugin.settings.defaultResponder)
 					.onChange((value) => {
-						this.plugin.settings.defaultResponder = value.trim() || "human";
-						void this.plugin.saveSettings();
+						this.picklePlugin.settings.defaultResponder = value.trim() || "human";
+						void this.picklePlugin.saveSettings();
 					})
 			);
 
@@ -95,7 +95,7 @@ export class PickleSettingsTab extends PluginSettingTab {
 					.setButtonText("Maintain")
 					.setCta()
 					.onClick(() => {
-						void this.plugin.ensureCollection().then((result) => {
+						void this.picklePlugin.ensureCollection().then((result) => {
 							new Notice(`Maintained Pickle collection: ${result.collectionPath}`);
 						});
 					})

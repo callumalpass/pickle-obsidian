@@ -1,4 +1,5 @@
 import { TFile, type App } from "obsidian";
+import { parse } from "yaml";
 import {
 	DEFAULT_ACK_RESPONSE_TYPE,
 	DEFAULT_APPROVAL_RESPONSE_TYPE,
@@ -20,11 +21,16 @@ import { buildResponseFrontmatter, linkTargetsRequest } from "./responseBuilder"
 import { deriveRequestState } from "./requestState";
 import {
 	MDBASE_CONFIG,
+	MDBASE_CONFIG_V02,
 	PICKLE_ACK_RESPONSE_TYPE,
+	PICKLE_ACK_RESPONSE_TYPE_V02,
 	PICKLE_APPROVAL_RESPONSE_TYPE,
+	PICKLE_APPROVAL_RESPONSE_TYPE_V02,
 	PICKLE_REQUEST_TYPE,
+	PICKLE_REQUEST_TYPE_V02,
 	defaultBaseFile,
 } from "./templates";
+import { normalizeTypeDefinition } from "./typeDefinition";
 import {
 	VaultCollection,
 	type VaultCollectionRow,
@@ -78,22 +84,32 @@ export class PickleCollectionService {
 			joinVaultPath(this.collectionFolder, this.settings.attachmentsFolder)
 		);
 
-		await this.writeTextFileIfMissing(
-			joinVaultPath(this.collectionFolder, "mdbase.yaml"),
-			MDBASE_CONFIG
-		);
-		await this.ensurePickleRequestTypeFile();
+		const configPath = joinVaultPath(this.collectionFolder, "mdbase.yaml");
+		await this.writeTextFileIfMissing(configPath, await this.defaultConfigTemplate());
+		const profile = await this.readCollectionProfile();
+		const templates = profile === "v0.3"
+			? {
+				request: PICKLE_REQUEST_TYPE,
+				approval: PICKLE_APPROVAL_RESPONSE_TYPE,
+				ack: PICKLE_ACK_RESPONSE_TYPE,
+			}
+			: {
+				request: PICKLE_REQUEST_TYPE_V02,
+				approval: PICKLE_APPROVAL_RESPONSE_TYPE_V02,
+				ack: PICKLE_ACK_RESPONSE_TYPE_V02,
+			};
+		await this.ensurePickleRequestTypeFile(templates.request, profile === "v0.2");
 		await this.writeTextFileIfMissing(
 			joinVaultPath(
 				this.collectionFolder,
 				"_types",
 				`${DEFAULT_APPROVAL_RESPONSE_TYPE}.md`
 			),
-			PICKLE_APPROVAL_RESPONSE_TYPE
+			templates.approval
 		);
 		await this.writeTextFileIfMissing(
 			joinVaultPath(this.collectionFolder, "_types", `${DEFAULT_ACK_RESPONSE_TYPE}.md`),
-			PICKLE_ACK_RESPONSE_TYPE
+			templates.ack
 		);
 		await this.ensureDefaultBaseFile();
 
@@ -103,24 +119,64 @@ export class PickleCollectionService {
 		};
 	}
 
+	private async defaultConfigTemplate(): Promise<string> {
+		const requestTypePath = joinVaultPath(
+			this.collectionFolder,
+			"_types",
+			`${REQUEST_TYPE}.md`
+		);
+		const existing = this.app.vault.getAbstractFileByPath(requestTypePath);
+		if (!(existing instanceof TFile)) return MDBASE_CONFIG;
+		try {
+			const parsed = parseMarkdown(await this.app.vault.cachedRead(existing));
+			return parsed.frontmatter.kind === "mdbase.type"
+				? MDBASE_CONFIG
+				: MDBASE_CONFIG_V02;
+		} catch {
+			throw new Error(`Cannot infer mdbase profile from existing type: ${requestTypePath}`);
+		}
+	}
+
 	async ensureDefaultBaseFile(): Promise<string> {
 		await this.writeTextFile(this.baseVaultPath, defaultBaseFile());
 		return this.baseVaultPath;
 	}
 
-	private async ensurePickleRequestTypeFile(): Promise<void> {
+	private async ensurePickleRequestTypeFile(template: string, isLegacy: boolean): Promise<void> {
 		const typePath = joinVaultPath(this.collectionFolder, "_types", `${REQUEST_TYPE}.md`);
 		const existing = this.app.vault.getAbstractFileByPath(typePath);
 		if (!(existing instanceof TFile)) {
-			await this.writeTextFile(typePath, PICKLE_REQUEST_TYPE);
+			await this.writeTextFile(typePath, template);
 			return;
 		}
+		if (!isLegacy) return;
 
 		const current = await this.app.vault.cachedRead(existing);
 		const updated = this.removeBundledTypeDefaults(current);
 		if (updated !== current) {
 			await this.app.vault.modify(existing, updated);
 		}
+	}
+
+	private async readCollectionProfile(): Promise<"v0.2" | "v0.3"> {
+		const configPath = joinVaultPath(this.collectionFolder, "mdbase.yaml");
+		const file = this.app.vault.getAbstractFileByPath(configPath);
+		if (!(file instanceof TFile)) {
+			throw new Error(`Missing mdbase config: ${configPath}`);
+		}
+		let config: Record<string, unknown>;
+		try {
+			const parsed: unknown = parse(await this.app.vault.cachedRead(file)) as unknown;
+			config = parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+				? parsed as Record<string, unknown>
+				: {};
+		} catch {
+			throw new Error(`Invalid mdbase config: ${configPath}`);
+		}
+		const version = typeof config.spec_version === "string" ? config.spec_version : "";
+		if (/^0\.3\.0(?:-[0-9A-Za-z.-]+)?$/.test(version)) return "v0.3";
+		if (/^0\.2(?:\.\d+)?$/u.test(version)) return "v0.2";
+		throw new Error(`Unsupported mdbase spec_version ${JSON.stringify(version)} in ${configPath}`);
 	}
 
 	private removeBundledTypeDefaults(content: string): string {
@@ -149,7 +205,7 @@ export class PickleCollectionService {
 			throw new Error(`Type file is missing a name: ${typePath}`);
 		}
 
-		return parsed.frontmatter as unknown as TypeDefinition;
+		return normalizeTypeDefinition(parsed.frontmatter);
 	}
 
 	async readRequest(vaultPath: string): Promise<PickleRequestRecord> {

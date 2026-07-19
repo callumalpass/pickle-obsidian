@@ -768,7 +768,23 @@ export class PickleResponseModal extends Modal {
 		if (initialValue !== undefined) return initialValue;
 		const existingValue = this.existingValueAtPath(path);
 		if (existingValue !== undefined) return existingValue;
+		const metadataValue = this.requestMetadataValueAtPath(path);
+		if (metadataValue !== undefined) return metadataValue;
 		return definition.default;
+	}
+
+	private requestMetadataValueAtPath(path: string): unknown {
+		const segments = path.split(".");
+		let value: unknown = this.request.frontmatter.metadata;
+		if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+
+		for (const segment of segments) {
+			if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+			value = (value as Record<string, unknown>)[segment];
+			if (value === undefined) return undefined;
+		}
+
+		return value;
 	}
 
 	private existingValueAtPath(path: string): unknown {
@@ -786,7 +802,11 @@ export class PickleResponseModal extends Modal {
 
 	private fieldHasAnyInput(definition: FieldDefinition, path: string): boolean {
 		if (this.touchedPaths.has(path)) return true;
-		if (this.existingValueAtPath(path) !== undefined || definition.default !== undefined) {
+		if (
+			this.existingValueAtPath(path) !== undefined ||
+			this.requestMetadataValueAtPath(path) !== undefined ||
+			definition.default !== undefined
+		) {
 			return true;
 		}
 
@@ -848,7 +868,7 @@ export class PickleResponseModal extends Modal {
 
 	private usesTextarea(definition: FieldDefinition, name: string): boolean {
 		return (
-			name === "comment" ||
+			name.includes("comment") ||
 			(definition.type === "object" && !definition.fields) ||
 			(definition.type === "list" && !definition.items)
 		);

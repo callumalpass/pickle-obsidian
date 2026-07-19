@@ -34,7 +34,7 @@ export default class PicklePlugin extends Plugin {
 	}
 
 	async loadSettings(): Promise<void> {
-		const loadedData = (await this.loadData()) as unknown;
+		const loadedData = await this.loadData();
 		const loadedSettings =
 			loadedData !== null && typeof loadedData === "object"
 				? (loadedData as Partial<PickleApprovalSettings>)

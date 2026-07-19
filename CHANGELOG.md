@@ -5,6 +5,16 @@ All notable changes to Pickle are documented in this file.
 The format is based on Keep a Changelog, and this project follows Semantic
 Versioning.
 
+## [Unreleased]
+
+### Changed
+
+- Create new Pickle collections with mdbase v0.3 JSON Schema type wrappers.
+- Preserve the legacy type grammar when maintaining an existing v0.2 collection.
+- Normalize v0.3 schemas for the response form and vault-native validation.
+- Apply v0.3 lifecycle-generated IDs and timestamps in the vault adapter.
+- Reject unsupported collection versions before writing bundled type files.
+
 ## [0.1.1] - 2026-06-01
 
 ### Fixed

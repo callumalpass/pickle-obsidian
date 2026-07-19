@@ -1,5 +1,6 @@
 import { TFile, type App } from "obsidian";
 import { parse } from "yaml";
+import { ulid } from "ulid";
 import { parseMarkdown, markdownWithFrontmatter } from "./frontmatter";
 import {
 	collectionRelativePath,
@@ -9,6 +10,7 @@ import {
 } from "./path";
 import { linkTargetsRequest, normalizeLinkTarget } from "./responseBuilder";
 import type { FieldDefinition, ParsedMarkdown, TypeDefinition, ValidationIssue } from "./types";
+import { normalizeTypeDefinition } from "./typeDefinition";
 
 export interface VaultCollectionRow {
 	path: string;
@@ -100,6 +102,7 @@ export class VaultCollection {
 			type: input.type,
 			...input.frontmatter,
 		};
+		await this.applyGeneratedFields(frontmatter, [input.type], "create");
 		const issues = await this.validateFrontmatter(path, frontmatter);
 		if (issues.length > 0) {
 			return {
@@ -137,6 +140,7 @@ export class VaultCollection {
 			...parsed.frontmatter,
 			...input.fields,
 		};
+		await this.applyGeneratedFields(frontmatter, this.typesFor(frontmatter), "update");
 		const issues = await this.validateFrontmatter(path, frontmatter);
 		if (issues.length > 0) {
 			return {
@@ -382,6 +386,16 @@ export class VaultCollection {
 					issues.push(this.typeIssue(path, field, "expected a datetime string"));
 				}
 				return issues;
+			case "date":
+				if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/u.test(value)) {
+					issues.push(this.typeIssue(path, field, "expected a date string"));
+				}
+				return issues;
+			case "time":
+				if (typeof value !== "string" || !/^\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u.test(value)) {
+					issues.push(this.typeIssue(path, field, "expected a time string"));
+				}
+				return issues;
 			case "list":
 				return this.validateListField(path, field, value, definition);
 			case "object":
@@ -516,7 +530,7 @@ export class VaultCollection {
 		}
 
 		const targetType = definition.target ?? definition.target_type;
-		if (!targetType) return [];
+		if (!targetType || targetType === "any") return [];
 
 		const matchingRow = this.cachedRowsForLinkValidation().find((row) => {
 			if (!row.types.includes(targetType)) return false;
@@ -560,7 +574,7 @@ export class VaultCollection {
 			const parsed = parseMarkdown(await this.app.vault.cachedRead(file));
 			const name = parsed.frontmatter.name;
 			if (typeof name !== "string") continue;
-			definitions.set(name, parsed.frontmatter as unknown as TypeDefinition);
+			definitions.set(name, normalizeTypeDefinition(parsed.frontmatter));
 		}
 		this.typeDefinitions = definitions;
 		return definitions;
@@ -606,6 +620,27 @@ export class VaultCollection {
 			}
 		}
 		return effective;
+	}
+
+	private async applyGeneratedFields(
+		frontmatter: Record<string, unknown>,
+		types: string[],
+		event: "create" | "update"
+	): Promise<void> {
+		const definitions = await this.readTypeDefinitions();
+		for (const type of types) {
+			const definition = definitions.get(type);
+			for (const [fieldName, fieldDefinition] of Object.entries(definition?.fields ?? {})) {
+				const generated = fieldDefinition.generated;
+				const onCreate = event === "create" && frontmatter[fieldName] === undefined;
+				if (generated === "ulid" && onCreate) frontmatter[fieldName] = ulid();
+				if (generated === "uuid" && onCreate) frontmatter[fieldName] = crypto.randomUUID();
+				if (generated === "now" && onCreate) frontmatter[fieldName] = new Date().toISOString();
+				if (generated === "now_on_write" && (event === "update" || onCreate)) {
+					frontmatter[fieldName] = new Date().toISOString();
+				}
+			}
+		}
 	}
 
 	private errorCodeForIssues(issues: ValidationIssue[]): string {

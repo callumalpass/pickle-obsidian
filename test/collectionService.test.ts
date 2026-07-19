@@ -32,7 +32,10 @@ describe("collection service attachments", () => {
 			"utf8"
 		);
 		expect(ackType).toContain(`name: ${DEFAULT_ACK_RESPONSE_TYPE}`);
+		expect(ackType).toContain("kind: mdbase.type");
 		expect(ackType).toContain("message:");
+		const config = await readFile(join(root, "_pickle", "mdbase.yaml"), "utf8");
+		expect(config).toContain('spec_version: "0.3.0"');
 	});
 
 	it("removes field defaults from existing bundled request type files", async () => {
@@ -70,6 +73,34 @@ describe("collection service attachments", () => {
 		expect(typeFile).not.toContain("default: approval");
 		expect(typeFile).not.toContain("default: pending");
 		expect(typeFile).not.toContain("default: normal");
+		const config = await readFile(join(root, "_pickle", "mdbase.yaml"), "utf8");
+		expect(config).toContain('spec_version: "0.2.1"');
+	});
+
+	it("keeps legacy templates in an existing v0.2 collection", async () => {
+		const { root, service } = await createService();
+		await mkdir(join(root, "_pickle"), { recursive: true });
+		await writeFile(
+			join(root, "_pickle", "mdbase.yaml"),
+			'spec_version: "0.2.1"\nsettings:\n  types_folder: "_types"\n'
+		);
+
+		await service.ensureCollection();
+		const typeFile = await readFile(
+			join(root, "_pickle", "_types", `${DEFAULT_APPROVAL_RESPONSE_TYPE}.md`),
+			"utf8"
+		);
+		expect(typeFile).toContain("fields:");
+		expect(typeFile).not.toContain("kind: mdbase.type");
+	});
+
+	it("fails closed for unsupported configs before writing type files", async () => {
+		const { root, service } = await createService();
+		await mkdir(join(root, "_pickle"), { recursive: true });
+		await writeFile(join(root, "_pickle", "mdbase.yaml"), 'spec_version: "0.4.0"\n');
+
+		await expect(service.ensureCollection()).rejects.toThrow("Unsupported mdbase spec_version");
+		expect(existsSync(join(root, "_pickle", "_types", "pickle_request.md"))).toBe(false);
 	});
 
 	it("does not create a per-response attachment folder when there are no attachments", async () => {
