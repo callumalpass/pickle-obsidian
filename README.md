@@ -1,5 +1,7 @@
 # Pickle
 
+> **Retired (Oct 2026), no longer maintained.** Historical workflow and data-format documentation is preserved below for existing local data and reference.
+
 Pickle is a local-first, file-based Obsidian inbox for typed agent requests and
 structured human responses.
 
